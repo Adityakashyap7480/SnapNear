@@ -1,0 +1,88 @@
+@import 'tailwindcss';
+
+@custom-variant short (@media (max-height: 820px));
+@custom-variant shorter (@media (max-height: 680px));
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-yellow: #ffc837;
+  --color-brand-orange: #ff8008;
+  --color-brand-navy: #0f172a;
+  --color-brand-card: #1e293b;
+  --color-brand-slate: #334155;
+  --color-brand-emerald: #10b981;
+  --color-brand-violet: #6366f1;
+
+  --shadow-glow: 0 0 25px -5px rgba(255, 128, 8, 0.45);
+  --shadow-glow-violet: 0 0 25px -5px rgba(99, 102, 241, 0.45);
+  --shadow-card: 0 8px 30px rgba(15, 23, 42, 0.06);
+
+  --animate-radar: radar 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.5s ease-out both;
+
+  @keyframes radar {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(2.2);
+      opacity: 0;
+    }
+  }
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-slate-50 font-sans text-slate-900 antialiased;
+    overflow-x: clip;
+  }
+
+  input[type='date']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.6;
+  }
+}
+
+@utility no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility bg-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}

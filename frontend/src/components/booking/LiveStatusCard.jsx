@@ -1,24 +1,29 @@
 import { BellRing, Camera, MapPinned, MessageCircle, PhoneCall, Radar, Star, X } from 'lucide-react';
 import Avatar from '../ui/Avatar';
+import Badge from '../ui/Badge';
 import StatusBadge from '../ui/StatusBadge';
 import Button from '../ui/Button';
-import { STATUS_META } from '../../utils/bookingStatus';
+import PayNowPanel from '../payment/PayNowPanel';
+import { BOOKING_STATUS } from '../../config/constants';
+import { STATUS_META, isCompleted, isSearching } from '../../utils/bookingStatus';
 import { formatDate, formatINR } from '../../utils/format';
 
 const STEP_TEXT = {
-  assigned: { label: 'Photographer is heading to your location', eta: 'ETA ~15 mins' },
-  arrived: { label: 'Photographer arrived at your doorstep', eta: 'Setting up gear' },
-  shooting: { label: 'Session in progress 📸', eta: 'Live shoot active' },
-  completed: { label: 'Shoot completed & raw preview shared 🎉', eta: 'Done' },
+  [BOOKING_STATUS.ASSIGNED]: { label: 'Photographer is heading to your location', eta: 'ETA ~15 mins' },
+  [BOOKING_STATUS.ARRIVED]: { label: 'Photographer arrived at your doorstep', eta: 'Setting up gear' },
+  [BOOKING_STATUS.SHOOTING]: { label: 'Session in progress 📸', eta: 'Live shoot active' },
+  [BOOKING_STATUS.COMPLETED]: { label: 'Shoot completed 🎉', eta: 'Done' },
 };
 
-export default function LiveStatusCard({ booking, onCancel, cancelling }) {
+const CANCELLABLE = [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.ASSIGNED];
+
+export default function LiveStatusCard({ booking, onCancel, cancelling, onPay, paying }) {
   if (!booking) {
     return (
       <div id="booking-status" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex items-center justify-between">
           <h3 className="font-display text-sm font-bold text-slate-900">Current Shoot Status</h3>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">Ready to Book</span>
+          <Badge size="md">Ready to Book</Badge>
         </div>
         <div className="py-6 text-center text-xs text-slate-400">
           <MapPinned className="mx-auto mb-2 h-8 w-8 text-slate-300" />
@@ -30,7 +35,9 @@ export default function LiveStatusCard({ booking, onCancel, cancelling }) {
 
   const { status, creator } = booking;
   const step = STEP_TEXT[status];
-  const canCancel = status === 'searching' || status === 'assigned';
+  const canCancel = CANCELLABLE.includes(status);
+  const searching = isSearching(status);
+  const completed = isCompleted(status);
   const waPhone = creator?.phone ? `91${creator.phone}` : '';
   const waText = encodeURIComponent(
     `Hi ${creator?.name?.split(' ')[0] || ''}, I booked you on SnapNear (${booking.code}). Can you confirm your arrival time?`
@@ -45,10 +52,10 @@ export default function LiveStatusCard({ booking, onCancel, cancelling }) {
             {booking.code} &bull; {booking.serviceLabel} ({booking.durationLabel}) &bull; {formatINR(booking.total)}
           </p>
         </div>
-        <StatusBadge status={status} long pulse={status === 'searching'} />
+        <StatusBadge status={status} long pulse={searching} />
       </div>
 
-      {status === 'searching' && (
+      {searching && (
         <div className="flex flex-col items-center justify-center py-5 text-center">
           <div className="relative mb-3 flex h-16 w-16 items-center justify-center">
             <div className="absolute inset-0 animate-radar rounded-full bg-brand-orange/20" />
@@ -66,7 +73,7 @@ export default function LiveStatusCard({ booking, onCancel, cancelling }) {
         </div>
       )}
 
-      {creator && status !== 'cancelled' && (
+      {creator && status !== BOOKING_STATUS.CANCELLED && (
         <div className="space-y-4 border-t border-slate-100 pt-4">
           <div className="flex items-start gap-3">
             <Avatar name={creator.name} size="lg" ring="ring-2 ring-emerald-500 ring-offset-2" />
@@ -106,7 +113,7 @@ export default function LiveStatusCard({ booking, onCancel, cancelling }) {
             </div>
           )}
 
-          {status !== 'completed' && creator.phone && (
+          {!completed && creator.phone && (
             <div className="flex gap-2">
               <a
                 href={`tel:+91${creator.phone}`}
@@ -126,6 +133,8 @@ export default function LiveStatusCard({ booking, onCancel, cancelling }) {
           )}
         </div>
       )}
+
+      {completed && <PayNowPanel booking={booking} onPay={onPay} paying={paying} />}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
         <span>

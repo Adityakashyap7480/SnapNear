@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { BOOKING_STATUS } from '../constants/roles.js';
+import { BOOKING_STATUS, PAYMENT_STATUS, SETTLEMENT_STATUS } from '../constants/roles.js';
 
 const personSnapshotSchema = new mongoose.Schema(
   {
@@ -51,11 +51,33 @@ const bookingSchema = new mongoose.Schema(
     completedAt: Date,
     cancelledAt: Date,
     cancelledBy: { type: String, enum: ['client', 'superadmin'] },
+
+    // Customer -> SnapNear (Razorpay). `orderId` backs in-app checkout, `linkId` backs the partner's QR.
+    payment: {
+      status: { type: String, enum: Object.values(PAYMENT_STATUS) },
+      orderId: String,
+      linkId: String,
+      linkUrl: String,
+      paymentId: String,
+      method: String,
+      via: { type: String, enum: ['app', 'qr'] },
+      paidAt: Date,
+    },
+
+    // SnapNear -> partner (manual UPI payout after the hold period)
+    settlement: {
+      status: { type: String, enum: Object.values(SETTLEMENT_STATUS) },
+      eligibleAt: Date,
+      payout: { type: mongoose.Schema.Types.ObjectId, ref: 'Payout' },
+      paidAt: Date,
+    },
   },
   { timestamps: true }
 );
 
 bookingSchema.index({ status: 1, serviceType: 1, createdAt: -1 });
+bookingSchema.index({ client: 1, 'payment.status': 1 });
+bookingSchema.index({ creator: 1, 'settlement.status': 1 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
 

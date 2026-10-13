@@ -7,6 +7,8 @@ import Button from '../../components/ui/Button';
 import { Input, PasswordInput, Select } from '../../components/ui/FormField';
 import { useAuth } from '../../context/AuthContext';
 import { ROLE_HOME } from '../../config/constants';
+import { ROUTES } from '../../config/routes';
+import { MESSAGES, isValidEmail, isValidPhone } from '../../utils/validators';
 
 const ROLE_OPTIONS = [
   {
@@ -88,8 +90,8 @@ export default function SignupPage() {
   const validate = () => {
     const next = {};
     if (form.name.trim().length < 2) next.name = 'Enter your full name';
-    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = 'Enter a valid email address';
-    if (!/^[6-9]\d{9}$/.test(form.phone.trim())) next.phone = 'Enter a valid 10-digit mobile number';
+    if (!isValidEmail(form.email)) next.email = MESSAGES.EMAIL;
+    if (!isValidPhone(form.phone)) next.phone = MESSAGES.PHONE;
     if (form.password.length < 8) next.password = 'Use at least 8 characters';
     else if (!/[A-Za-z]/.test(form.password) || !/\d/.test(form.password))
       next.password = 'Use a mix of letters and numbers';
@@ -137,7 +139,7 @@ export default function SignupPage() {
         <h2 className="mt-1 font-display text-3xl font-extrabold tracking-tight text-slate-900">Create your account</h2>
         <p className="mt-2 text-sm text-slate-500">
           Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-brand-orange hover:underline">
+          <Link to={ROUTES.LOGIN} className="font-semibold text-brand-orange hover:underline">
             Log in
           </Link>
         </p>

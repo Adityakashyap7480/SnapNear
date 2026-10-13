@@ -7,6 +7,7 @@ import {
   setDutyStatus,
   updateProfile,
 } from '../controllers/creator.controller.js';
+import { collectLink, creatorPaymentStatus } from '../controllers/payment.controller.js';
 import { authorize, protect } from '../middleware/auth.js';
 import validate from '../middleware/validate.js';
 import { dutyStatusSchema, updateCreatorProfileSchema } from '../validators/schemas.js';
@@ -22,5 +23,7 @@ router.patch('/profile', validate(updateCreatorProfileSchema), updateProfile);
 router.post('/requests/:id/accept', acceptRequest);
 router.post('/requests/:id/decline', declineRequest);
 router.patch('/jobs/:id/advance', advanceJob);
+router.post('/jobs/:id/collect', collectLink);
+router.get('/jobs/:id/payment', creatorPaymentStatus);
 
 export default router;

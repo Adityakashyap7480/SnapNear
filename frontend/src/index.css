@@ -22,6 +22,54 @@
   --animate-radar: radar 2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
   --animate-float: float 6s ease-in-out infinite;
   --animate-fade-up: fade-up 0.5s ease-out both;
+  --animate-pop-in: pop-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-gift-shake: gift-shake 0.75s ease-in-out both;
+  --animate-sparkle: sparkle 2.4s ease-in-out infinite;
+
+  @keyframes pop-in {
+    0% {
+      opacity: 0;
+      transform: scale(0.6);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes gift-shake {
+    0%,
+    100% {
+      transform: rotate(0deg) scale(1);
+    }
+    15% {
+      transform: rotate(-12deg) scale(1.05);
+    }
+    30% {
+      transform: rotate(10deg) scale(1.08);
+    }
+    45% {
+      transform: rotate(-8deg) scale(1.1);
+    }
+    60% {
+      transform: rotate(6deg) scale(1.14);
+    }
+    80% {
+      transform: rotate(-3deg) scale(1.2);
+    }
+  }
+
+  @keyframes sparkle {
+    0%,
+    100% {
+      opacity: 0.3;
+      transform: translateY(0) scale(0.9);
+    }
+    50% {
+      opacity: 1;
+      transform: translateY(-8px) scale(1.1);
+    }
+  }
 
   @keyframes radar {
     0% {

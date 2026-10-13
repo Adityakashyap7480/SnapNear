@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Briefcase, Camera, Radio, Star, Video, Wallet } from 'lucide-react';
 import Card, { EmptyState, StatCard } from '../../components/ui/Card';
 import Avatar from '../../components/ui/Avatar';
+import Badge from '../../components/ui/Badge';
 import { SearchInput } from '../../components/ui/FormField';
 import { PageLoader } from '../../components/ui/Spinner';
 import PageHeader from '../../components/admin/PageHeader';
@@ -9,6 +10,7 @@ import BookingsLedger from '../../components/admin/BookingsLedger';
 import AccountStatusBadge from '../../components/admin/AccountStatusBadge';
 import AccountActions from '../../components/admin/AccountActions';
 import { adminApi } from '../../api/services';
+import { BOOKING_FILTER } from '../../config/constants';
 import useAsync from '../../hooks/useAsync';
 import useAdminLive from '../../hooks/useAdminLive';
 import { formatDate, formatINR } from '../../utils/format';
@@ -39,9 +41,7 @@ function ServiceBadges({ services }) {
 function DutyBadge({ partner }) {
   if (partner.active > 0) {
     return (
-      <span className="shrink-0 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-indigo-800">
-        On a shoot
-      </span>
+      <Badge tone="indigo">On a shoot</Badge>
     );
   }
   if (partner.isOnline) {
@@ -88,7 +88,7 @@ export default function AdminPartnersPage() {
         <StatCard icon={Briefcase} label="Registered Partners" value={partners.length} hint="SnapNear Partner accounts" />
         <StatCard tone="emerald" icon={Radio} label="Online Now" value={online} hint="Receiving live pings" />
         <StatCard tone="violet" icon={Camera} label="Shoots In Progress" value={activeJobs} hint="Accepted & ongoing" />
-        <StatCard tone="amber" icon={Wallet} label="Paid to Partners" value={formatINR(paidOut, { fixed: true })} hint="80% settlements" />
+        <StatCard tone="amber" icon={Wallet} label="Partner Earnings" value={formatINR(paidOut, { fixed: true })} hint="80% of completed shoots" />
       </div>
 
       <Card className="p-4 sm:p-6">
@@ -257,11 +257,11 @@ export default function AdminPartnersPage() {
       <BookingsLedger
         title="Partner Requests & Jobs"
         subtitle="Open requests waiting for a partner and shoots in progress"
-        initialStatus="active"
+        initialStatus={BOOKING_FILTER.ACTIVE}
         tabs={[
-          { id: 'active', label: 'Live / Active' },
-          { id: 'searching', label: 'Waiting for Partner' },
-          { id: 'completed', label: 'Completed' },
+          { id: BOOKING_FILTER.ACTIVE, label: 'Live / Active' },
+          { id: BOOKING_FILTER.SEARCHING, label: 'Waiting for Partner' },
+          { id: BOOKING_FILTER.COMPLETED, label: 'Completed' },
         ]}
       />
     </div>

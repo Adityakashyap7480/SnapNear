@@ -4,8 +4,10 @@ import asyncHandler from '../utils/asyncHandler.js';
 import { generateBookingCode } from '../utils/bookingCode.js';
 import { serializeBooking } from '../utils/serializers.js';
 import { getQuote } from '../constants/pricing.js';
-import { BOOKING_STATUS } from '../constants/roles.js';
+import { BOOKING_STATUS, PAYMENT_STATUS } from '../constants/roles.js';
+import { BOOKING_EVENTS } from '../constants/events.js';
 import { notifyBookingChange } from '../socket/index.js';
+import { isPaymentDue, syncPaymentQuietly } from '../services/payments.js';
 
 const MAX_OPEN_BOOKINGS = 3;
 const CREATOR_FIELDS = 'name phone email creatorProfile';
@@ -20,6 +22,13 @@ export const createBooking = asyncHandler(async (req, res) => {
   const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   if (data.shootDate < todayIST) {
     throw ApiError.badRequest('Shoot date cannot be in the past');
+  }
+
+  const unpaid = await Booking.findOne({ client: client._id, 'payment.status': PAYMENT_STATUS.DUE }).select('code total');
+  if (unpaid) {
+    throw ApiError.conflict(
+      `Please pay ₹${unpaid.total.toLocaleString('en-IN')} for your completed shoot ${unpaid.code} before booking a new one.`
+    );
   }
 
   const openCount = await Booking.countDocuments({
@@ -50,7 +59,7 @@ export const createBooking = asyncHandler(async (req, res) => {
     platformFee: quote.platformFee,
   });
 
-  notifyBookingChange(booking, 'booking:created');
+  notifyBookingChange(booking, BOOKING_EVENTS.CREATED);
 
   res.status(201).json({ success: true, booking: serializeBooking(booking) });
 });
@@ -61,7 +70,16 @@ export const getMyBookings = asyncHandler(async (req, res) => {
     .limit(50)
     .populate('creator', CREATOR_FIELDS);
 
-  res.json({ success: true, bookings: bookings.map((b) => serializeBooking(b)) });
+  // Catch QR / link payments that completed while nobody was watching
+  const synced = await Promise.all(
+    bookings.map(async (b) => {
+      if (!isPaymentDue(b) || (!b.payment.orderId && !b.payment.linkId)) return b;
+      const fresh = await syncPaymentQuietly(b);
+      return fresh === b ? b : fresh.populate('creator', CREATOR_FIELDS);
+    })
+  );
+
+  res.json({ success: true, bookings: synced.map((b) => serializeBooking(b)) });
 });
 
 export const cancelMyBooking = asyncHandler(async (req, res) => {
@@ -79,6 +97,6 @@ export const cancelMyBooking = asyncHandler(async (req, res) => {
     throw ApiError.conflict('This booking can no longer be cancelled');
   }
 
-  notifyBookingChange(booking, 'booking:cancelled');
+  notifyBookingChange(booking, BOOKING_EVENTS.CANCELLED);
   res.json({ success: true, booking: serializeBooking(booking) });
 });

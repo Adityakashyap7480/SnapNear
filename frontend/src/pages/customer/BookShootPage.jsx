@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Calendar, Clock, MapPin, Phone, Radio, User } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Calendar, Clock, IndianRupee, MapPin, Phone, Radio, User } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Card from '../../components/ui/Card';
 import { Input, Select, Textarea } from '../../components/ui/FormField';
@@ -10,21 +10,32 @@ import OccasionChips from '../../components/booking/OccasionChips';
 import FareCard from '../../components/booking/FareCard';
 import LiveStatusCard from '../../components/booking/LiveStatusCard';
 import BookingHistory from '../../components/booking/BookingHistory';
+import PaymentCelebration from '../../components/payment/PaymentCelebration';
 import { bookingApi } from '../../api/services';
 import { useAuth } from '../../context/AuthContext';
 import { useSocketEvent } from '../../context/SocketContext';
+import { BOOKING_EVENTS, SOCKET_EVENTS } from '../../config/events';
 import useCatalog from '../../hooks/useCatalog';
 import useAsync from '../../hooks/useAsync';
-import { isActive } from '../../utils/bookingStatus';
-import { todayISO } from '../../utils/format';
+import { BOOKING_STATUS } from '../../config/constants';
+import { isActive, isSearching } from '../../utils/bookingStatus';
+import { formatINR, todayISO } from '../../utils/format';
+import { isPaymentDue, openRazorpayCheckout } from '../../utils/payment';
 import { playChime } from '../../utils/sound';
+import { MESSAGES, isValidPhone } from '../../utils/validators';
 
 const EVENT_TOASTS = {
-  'booking:accepted': (b) => `🎉 ${b.creator?.name || 'A photographer'} accepted your shoot!`,
-  'booking:arrived': (b) => `📍 ${b.creator?.name || 'Your photographer'} has arrived at your doorstep`,
-  'booking:shooting': () => '📸 Your shoot has started',
-  'booking:completed': () => '✅ Shoot completed! Hope you loved it.',
-  'booking:cancelled': () => 'Booking was cancelled',
+  [BOOKING_EVENTS.ACCEPTED]: (b) => `🎉 ${b.creator?.name || 'A photographer'} accepted your shoot!`,
+  [BOOKING_EVENTS.ARRIVED]: (b) => `📍 ${b.creator?.name || 'Your photographer'} has arrived at your doorstep`,
+  [BOOKING_EVENTS.SHOOTING]: () => '📸 Your shoot has started',
+  [BOOKING_EVENTS.COMPLETED]: (b) => `✅ Shoot completed! Please pay ${formatINR(b.total)} to finish your booking.`,
+  [BOOKING_EVENTS.CANCELLED]: () => 'Booking was cancelled',
+};
+
+const LIVE_HEADLINE = {
+  [BOOKING_STATUS.ASSIGNED]: 'on the way!',
+  [BOOKING_STATUS.ARRIVED]: 'at your doorstep!',
+  [BOOKING_STATUS.SHOOTING]: 'shooting now!',
 };
 
 function SectionTitle({ step, title, accent = 'text-slate-500' }) {
@@ -60,6 +71,9 @@ export default function BookShootPage() {
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [payingId, setPayingId] = useState(null);
+  const [celebration, setCelebration] = useState(null);
+  const celebrated = useRef(new Set());
 
   useEffect(() => {
     if (catalog && !form.timeSlot) setForm((f) => ({ ...f, timeSlot: catalog.timeSlots[0] }));
@@ -71,17 +85,68 @@ export default function BookShootPage() {
 
   const list = bookings || [];
   const activeBookings = useMemo(() => list.filter((b) => isActive(b.status)), [list]);
-  const focused = list.find((b) => b.id === selectedId) || activeBookings[0] || null;
+  const dueBooking = list.find(isPaymentDue) || null;
+  const focused = list.find((b) => b.id === selectedId) || activeBookings[0] || dueBooking || null;
 
-  useSocketEvent('booking:update', async (payload) => {
+  const scrollToStatus = () =>
+    document.getElementById('booking-status')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  // The verify response and the socket event both report a payment; celebrate it once.
+  const celebrate = (b) => {
+    if (celebrated.current.has(b.id)) return;
+    celebrated.current.add(b.id);
+    setCelebration({
+      key: b.id,
+      role: 'customer',
+      amount: b.total,
+      code: b.code,
+      counterpart: b.creator?.name,
+      method: b.payment?.method,
+      viewerName: user.name,
+    });
+  };
+  const closeCelebration = useCallback(() => setCelebration(null), []);
+
+  useSocketEvent(SOCKET_EVENTS.BOOKING_UPDATE, async (payload) => {
     const fresh = await reload();
     const b = fresh?.find((x) => x.id === payload.bookingId);
-    const message = b && EVENT_TOASTS[payload.event]?.(b);
-    if (message && payload.event !== 'booking:created') {
-      playChime(payload.event === 'booking:accepted' ? 'broadcast' : 'ping');
-      toast(message, { icon: null });
+    if (!b) return;
+
+    if (payload.event === BOOKING_EVENTS.PAID) {
+      celebrate(b);
+      return;
+    }
+    if (payload.event === BOOKING_EVENTS.COMPLETED) {
+      setSelectedId(b.id);
+      setTimeout(scrollToStatus, 150);
+    }
+    const message = EVENT_TOASTS[payload.event]?.(b);
+    if (message) {
+      playChime(payload.event === BOOKING_EVENTS.ACCEPTED ? 'broadcast' : 'ping');
+      toast(message, { icon: null, duration: payload.event === BOOKING_EVENTS.COMPLETED ? 7000 : 4000 });
     }
   });
+
+  const pay = async (booking) => {
+    setPayingId(booking.id);
+    try {
+      const { checkout } = await bookingApi.startPayment(booking.id);
+      const result = await openRazorpayCheckout(checkout, { onFailed: (msg) => toast.error(msg) });
+      if (!result) {
+        toast('Payment not completed. You can pay anytime from here.', { icon: 'ℹ️' });
+        return;
+      }
+      const { booking: paid } = await bookingApi.verifyPayment(booking.id, result);
+      setBookings((prev) => prev.map((b) => (b.id === paid.id ? paid : b)));
+      celebrate(paid);
+    } catch (err) {
+      toast.error(err.message);
+      // The payment may still have gone through (e.g. network drop); the list re-checks with Razorpay
+      reload();
+    } finally {
+      setPayingId(null);
+    }
+  };
 
   const set = (name, value) => {
     setForm((f) => ({ ...f, [name]: value }));
@@ -92,16 +157,19 @@ export default function BookShootPage() {
     const next = {};
     if (form.address.trim().length < 8) next.address = 'Enter your full doorstep address (tower, flat, society)';
     if (form.contactName.trim().length < 2) next.contactName = 'Enter contact name';
-    if (!/^[6-9]\d{9}$/.test(form.contactPhone)) next.contactPhone = 'Enter a valid 10-digit mobile number';
+    if (!isValidPhone(form.contactPhone)) next.contactPhone = MESSAGES.PHONE;
     if (!form.shootDate || form.shootDate < todayISO()) next.shootDate = 'Pick today or a future date';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
-  const scrollToStatus = () =>
-    document.getElementById('booking-status')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
   const broadcast = async () => {
+    if (dueBooking) {
+      toast.error(`Please pay ${formatINR(dueBooking.total)} for ${dueBooking.code} before booking a new shoot`);
+      setSelectedId(dueBooking.id);
+      scrollToStatus();
+      return;
+    }
     if (!validate()) {
       toast.error('Please complete the highlighted fields');
       return;
@@ -142,7 +210,34 @@ export default function BookShootPage() {
 
   return (
     <div className="space-y-6">
-      {live && live.status !== 'searching' && (
+      {celebration && <PaymentCelebration key={celebration.key} celebration={celebration} onClose={closeCelebration} />}
+
+      {dueBooking && (
+        <div className="flex animate-fade-up flex-col gap-3 rounded-2xl bg-gradient-to-r from-brand-orange to-amber-500 p-4 text-white shadow-lg sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
+              <IndianRupee className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="font-display text-sm font-bold">Payment pending: {formatINR(dueBooking.total)}</h4>
+              <p className="truncate text-xs text-orange-50">
+                {dueBooking.code} &bull; {dueBooking.occasion}
+                {dueBooking.creator ? ` with ${dueBooking.creator.name}` : ''}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => pay(dueBooking)}
+            disabled={payingId === dueBooking.id}
+            className="shrink-0 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-brand-orange transition hover:bg-orange-50 disabled:opacity-60 sm:py-2"
+          >
+            {payingId === dueBooking.id ? 'Opening...' : `Pay ${formatINR(dueBooking.total)}`}
+          </button>
+        </div>
+      )}
+
+      {live && !isSearching(live.status) && (
         <div className="flex animate-fade-up flex-col gap-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 p-4 text-white shadow-lg sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20">
@@ -151,7 +246,7 @@ export default function BookShootPage() {
             <div className="min-w-0">
               <h4 className="font-display text-sm font-bold">
                 {live.creator?.name} is{' '}
-                {live.status === 'assigned' ? 'on the way!' : live.status === 'arrived' ? 'at your doorstep!' : 'shooting now!'}
+                {LIVE_HEADLINE[live.status]}
               </h4>
               <p className="truncate text-xs text-emerald-100">{live.address}</p>
             </div>
@@ -243,7 +338,13 @@ export default function BookShootPage() {
 
         <div className="min-w-0 space-y-4 lg:col-span-5">
           <FareCard tier={tier} serviceLabel={serviceLabel} onBroadcast={broadcast} submitting={submitting} />
-          <LiveStatusCard booking={focused} onCancel={cancel} cancelling={cancellingId === focused?.id} />
+          <LiveStatusCard
+            booking={focused}
+            onCancel={cancel}
+            cancelling={cancellingId === focused?.id}
+            onPay={pay}
+            paying={payingId === focused?.id}
+          />
         </div>
       </div>
 

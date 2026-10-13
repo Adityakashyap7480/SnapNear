@@ -13,6 +13,12 @@ const env = {
     .map((o) => o.trim().replace(/\/$/, ''))
     .filter(Boolean),
   supportEmail: process.env.SUPPORT_EMAIL || 'support@snapnear.in',
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID?.trim() || '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET?.trim() || '',
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || '',
+  },
+  payoutHoldDays: Number(process.env.PAYOUT_HOLD_DAYS) || 7,
 };
 
 env.isProduction = env.nodeEnv === 'production';

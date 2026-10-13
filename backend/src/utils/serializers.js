@@ -50,6 +50,12 @@ export function serializeBooking(booking, { hideClientContact = false } = {}) {
     completedAt: b.completedAt,
     cancelledAt: b.cancelledAt,
     cancelledBy: b.cancelledBy,
+    payment: b.payment?.status
+      ? { status: b.payment.status, method: b.payment.method || null, via: b.payment.via || null, paidAt: b.payment.paidAt || null }
+      : null,
+    settlement: b.settlement?.status
+      ? { status: b.settlement.status, eligibleAt: b.settlement.eligibleAt || null, paidAt: b.settlement.paidAt || null }
+      : null,
     createdAt: b.createdAt,
     updatedAt: b.updatedAt,
     isOpen: b.status === BOOKING_STATUS.SEARCHING,

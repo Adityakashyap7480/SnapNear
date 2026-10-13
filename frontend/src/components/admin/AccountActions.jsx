@@ -5,10 +5,11 @@ import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import { Textarea } from '../ui/FormField';
 import { adminApi } from '../../api/services';
+import { ACCOUNT_STATUS } from '../../config/constants';
 
 const OPTIONS = [
   {
-    status: 'active',
+    status: ACCOUNT_STATUS.ACTIVE,
     label: 'Active',
     icon: CheckCircle2,
     text: 'Can log in and use SnapNear normally.',
@@ -19,7 +20,7 @@ const OPTIONS = [
     done: (name) => `${name} is active again and can log in.`,
   },
   {
-    status: 'suspended',
+    status: ACCOUNT_STATUS.SUSPENDED,
     label: 'Suspended',
     icon: Clock,
     text: "Temporary hold. Logged out right away and can't log in until you reactivate.",
@@ -30,7 +31,7 @@ const OPTIONS = [
     done: (name) => `${name} has been suspended and logged out.`,
   },
   {
-    status: 'blocked',
+    status: ACCOUNT_STATUS.BLOCKED,
     label: 'Blocked',
     icon: Ban,
     text: 'For fraud, abuse or serious policy violations. Logged out and access removed.',
@@ -55,7 +56,7 @@ function impactNote(kind, user) {
 }
 
 export default function AccountActions({ user, kind, onChanged }) {
-  const current = user.accountStatus || 'active';
+  const current = user.accountStatus || ACCOUNT_STATUS.ACTIVE;
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(current);
   const [reason, setReason] = useState('');
@@ -69,7 +70,7 @@ export default function AccountActions({ user, kind, onChanged }) {
   const close = useCallback(() => !saving && setOpen(false), [saving]);
 
   const choice = optionFor(selected);
-  const restricting = selected !== 'active';
+  const restricting = selected !== ACCOUNT_STATUS.ACTIVE;
   const unchanged = selected === current && (!restricting || reason.trim() === (user.statusReason || ''));
   const confirmLabel = selected === current && restricting ? 'Update reason' : choice.action;
 
@@ -168,7 +169,7 @@ export default function AccountActions({ user, kind, onChanged }) {
                 rows={2}
                 maxLength={300}
                 placeholder={
-                  selected === 'blocked'
+                  selected === ACCOUNT_STATUS.BLOCKED
                     ? 'e.g. Repeated fake bookings reported by partners'
                     : 'e.g. Under review after a customer complaint'
                 }

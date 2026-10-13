@@ -8,41 +8,44 @@ import PartnerAppPage from '../pages/partner/PartnerAppPage';
 import PlatformDashboardPage from '../pages/admin/PlatformDashboardPage';
 import AdminCustomersPage from '../pages/admin/AdminCustomersPage';
 import AdminPartnersPage from '../pages/admin/AdminPartnersPage';
+import AdminPayoutsPage from '../pages/admin/AdminPayoutsPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import { ROLES } from '../config/constants';
+import { ROUTES } from '../config/routes';
 
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<HomeRedirect />} />
+      <Route path={ROUTES.HOME} element={<HomeRedirect />} />
 
       <Route element={<GuestRoute />}>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
+        <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+        <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
       </Route>
 
       <Route element={<ProtectedRoute roles={[ROLES.CLIENT]} />}>
         <Route element={<PortalLayout />}>
-          <Route path="/book" element={<BookShootPage />} />
+          <Route path={ROUTES.BOOK} element={<BookShootPage />} />
         </Route>
       </Route>
 
       <Route element={<ProtectedRoute roles={[ROLES.CREATOR]} />}>
         <Route element={<PortalLayout />}>
-          <Route path="/partner" element={<PartnerAppPage />} />
+          <Route path={ROUTES.PARTNER} element={<PartnerAppPage />} />
         </Route>
       </Route>
 
       <Route element={<ProtectedRoute roles={[ROLES.SUPER_ADMIN]} />}>
         <Route element={<PortalLayout />}>
-          <Route path="/admin" element={<HomeRedirect />} />
-          <Route path="/admin/customers" element={<AdminCustomersPage />} />
-          <Route path="/admin/partners" element={<AdminPartnersPage />} />
-          <Route path="/admin/platform" element={<PlatformDashboardPage />} />
+          <Route path={ROUTES.ADMIN} element={<HomeRedirect />} />
+          <Route path={ROUTES.ADMIN_CUSTOMERS} element={<AdminCustomersPage />} />
+          <Route path={ROUTES.ADMIN_PARTNERS} element={<AdminPartnersPage />} />
+          <Route path={ROUTES.ADMIN_PLATFORM} element={<PlatformDashboardPage />} />
+          <Route path={ROUTES.ADMIN_PAYOUTS} element={<AdminPayoutsPage />} />
         </Route>
       </Route>
 
-      <Route path="*" element={<NotFoundPage />} />
+      <Route path={ROUTES.NOT_FOUND} element={<NotFoundPage />} />
     </Routes>
   );
 }

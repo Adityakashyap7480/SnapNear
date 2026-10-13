@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { Briefcase, CalendarPlus, ChevronDown, LogOut, PieChart, ShieldCheck, Users, Wifi, WifiOff } from 'lucide-react';
+import { Banknote, Briefcase, CalendarPlus, ChevronDown, LogOut, PieChart, ShieldCheck, Users, Wifi, WifiOff } from 'lucide-react';
 import Logo from '../components/ui/Logo';
 import Avatar from '../components/ui/Avatar';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { APP_NAMES, ROLE_LABELS, ROLES } from '../config/constants';
+import { ROUTES } from '../config/routes';
 
 const NAV_BY_ROLE = {
-  [ROLES.CLIENT]: [{ to: '/book', label: APP_NAMES.client, icon: CalendarPlus, color: 'text-brand-orange' }],
-  [ROLES.CREATOR]: [{ to: '/partner', label: APP_NAMES.creator, icon: Briefcase, color: 'text-brand-violet' }],
+  [ROLES.CLIENT]: [{ to: ROUTES.BOOK, label: APP_NAMES.client, icon: CalendarPlus, color: 'text-brand-orange' }],
+  [ROLES.CREATOR]: [{ to: ROUTES.PARTNER, label: APP_NAMES.creator, icon: Briefcase, color: 'text-brand-violet' }],
   [ROLES.SUPER_ADMIN]: [
-    { to: '/admin/customers', label: 'Customers', icon: Users, color: 'text-brand-orange' },
-    { to: '/admin/partners', label: 'Partners', icon: Briefcase, color: 'text-brand-violet' },
-    { to: '/admin/platform', label: APP_NAMES.platform, icon: PieChart, color: 'text-emerald-600' },
+    { to: ROUTES.ADMIN_CUSTOMERS, label: 'Customers', icon: Users, color: 'text-brand-orange' },
+    { to: ROUTES.ADMIN_PARTNERS, label: 'Partners', icon: Briefcase, color: 'text-brand-violet' },
+    { to: ROUTES.ADMIN_PLATFORM, label: APP_NAMES.platform, icon: PieChart, color: 'text-emerald-600' },
+    { to: ROUTES.ADMIN_PAYOUTS, label: 'Payouts', icon: Banknote, color: 'text-teal-600' },
   ],
 };
 
@@ -90,7 +92,7 @@ export default function PortalLayout() {
                 key={to}
                 to={to}
                 className={({ isActive }) =>
-                  `flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition ${
+                  `flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition lg:px-3.5 ${
                     isActive ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                   }`
                 }

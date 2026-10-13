@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { BadgeCheck, CheckCheck, History, IndianRupee, Locate, Power, Radar, Star, Wallet, Camera, Landmark } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Card, { EmptyState, StatCard } from '../../components/ui/Card';
 import Avatar from '../../components/ui/Avatar';
+import Badge from '../../components/ui/Badge';
 import { PageLoader } from '../../components/ui/Spinner';
 import RequestCard from '../../components/partner/RequestCard';
 import ActiveJobCard from '../../components/partner/ActiveJobCard';
 import JobHistory from '../../components/partner/JobHistory';
+import CollectPaymentCard from '../../components/partner/CollectPaymentCard';
+import PaymentQrModal from '../../components/partner/PaymentQrModal';
+import WalletCard from '../../components/partner/WalletCard';
+import PaymentCelebration from '../../components/payment/PaymentCelebration';
 import { creatorApi } from '../../api/services';
 import { useSocketEvent } from '../../context/SocketContext';
+import { BOOKING_EVENTS, SOCKET_EVENTS } from '../../config/events';
 import useAsync from '../../hooks/useAsync';
-import { CREATOR_NEXT_ACTION } from '../../utils/bookingStatus';
+import { CREATOR_NEXT_ACTION, isCompleted } from '../../utils/bookingStatus';
 import { formatINR } from '../../utils/format';
 import { playChime } from '../../utils/sound';
 
@@ -18,10 +24,36 @@ export default function PartnerAppPage() {
   const { data, setData, loading, error, reload } = useAsync(() => creatorApi.dashboard(), []);
   const [togglingDuty, setTogglingDuty] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [qrJob, setQrJob] = useState(null);
+  const [celebration, setCelebration] = useState(null);
+  const celebrated = useRef(new Set());
 
-  useSocketEvent('feed:update', async (payload) => {
+  // The QR poll and the socket event can both report the same payment; celebrate it once.
+  const celebratePayment = useCallback(
+    (booking) => {
+      setQrJob((current) => (current?.id === booking.id ? null : current));
+      if (celebrated.current.has(booking.id)) return;
+      celebrated.current.add(booking.id);
+      setCelebration({
+        key: booking.id,
+        role: 'partner',
+        amount: booking.total,
+        credited: booking.creatorPayout,
+        code: booking.code,
+        counterpart: booking.client?.name,
+        method: booking.payment?.method,
+        holdDays: data?.wallet?.holdDays,
+      });
+      reload();
+    },
+    [data?.wallet?.holdDays, reload]
+  );
+  const closeQr = useCallback(() => setQrJob(null), []);
+  const closeCelebration = useCallback(() => setCelebration(null), []);
+
+  useSocketEvent(SOCKET_EVENTS.FEED_UPDATE, async (payload) => {
     const fresh = await reload();
-    if (payload.event !== 'booking:created' || !fresh?.profile.creatorProfile.isOnline) return;
+    if (payload.event !== BOOKING_EVENTS.CREATED || !fresh?.profile.creatorProfile.isOnline) return;
     const isForMe = fresh.requests.some((r) => r.id === payload.bookingId);
     if (isForMe) {
       playChime('broadcast');
@@ -29,18 +61,30 @@ export default function PartnerAppPage() {
     }
   });
 
-  useSocketEvent('booking:update', async (payload) => {
-    await reload();
-    if (payload.event === 'booking:cancelled') {
+  useSocketEvent(SOCKET_EVENTS.BOOKING_UPDATE, async (payload) => {
+    const fresh = await reload();
+    if (payload.event === BOOKING_EVENTS.CANCELLED) {
       playChime('ping');
       toast.error(`Booking ${payload.code} was cancelled`);
     }
+    if (payload.event === BOOKING_EVENTS.PAID) {
+      const job = fresh?.history.find((h) => h.id === payload.bookingId);
+      if (job) celebratePayment(job);
+    }
+  });
+
+  useSocketEvent(SOCKET_EVENTS.WALLET_PAYOUT, async (payload) => {
+    await reload();
+    playChime('success');
+    toast.success(`💸 SnapNear sent ${formatINR(payload.amount, { fixed: true })} to your UPI for ${payload.bookingCount} shoot(s)!`, {
+      duration: 8000,
+    });
   });
 
   if (loading) return <PageLoader label="Loading SnapNear Partner..." />;
   if (error || !data) return <p className="py-20 text-center text-sm text-red-600">{error}</p>;
 
-  const { profile, requests, activeJob, history, stats } = data;
+  const { profile, requests, activeJob, awaitingPayment, history, stats, wallet } = data;
   const cp = profile.creatorProfile;
   const online = cp.isOnline;
 
@@ -87,8 +131,8 @@ export default function PartnerAppPage() {
     try {
       const { booking } = await creatorApi.advance(job.id);
       playChime('ping');
-      if (booking.status === 'completed') {
-        toast.success(`Shoot completed! ${formatINR(booking.creatorPayout, { fixed: true })} added to your earnings.`);
+      if (isCompleted(booking.status)) {
+        toast.success(`Shoot completed! Collect ${formatINR(booking.total)} from the customer via SnapNear.`, { duration: 6000 });
       } else {
         toast.success(`Status updated: ${CREATOR_NEXT_ACTION[job.status].label}`);
       }
@@ -102,6 +146,9 @@ export default function PartnerAppPage() {
 
   return (
     <div className="space-y-6">
+      {celebration && <PaymentCelebration key={celebration.key} celebration={celebration} onClose={closeCelebration} />}
+      {qrJob && <PaymentQrModal key={qrJob.id} job={qrJob} onClose={closeQr} onPaid={celebratePayment} />}
+
       <Card className="flex flex-col justify-between gap-4 p-4 sm:p-5 md:flex-row md:items-center">
         <div className="flex min-w-0 items-center gap-3.5">
           <Avatar name={profile.name} size="lg" ring="ring-2 ring-brand-violet ring-offset-2" />
@@ -109,9 +156,9 @@ export default function PartnerAppPage() {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-display text-lg font-bold text-slate-900">{profile.name}</h2>
               {cp.isVerified && (
-                <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                  <CheckCheck className="h-3 w-3" /> Verified Partner
-                </span>
+                <Badge tone="emerald" icon={CheckCheck}>
+                  Verified Partner
+                </Badge>
               )}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2.5 text-xs text-slate-600">
@@ -167,6 +214,8 @@ export default function PartnerAppPage() {
         <StatCard icon={Landmark} label="Platform Commission" value={formatINR(stats.platformFeePaid, { fixed: true })} hint="20% tech fee contribution" />
       </div>
 
+      {awaitingPayment.length > 0 && <CollectPaymentCard jobs={awaitingPayment} onShowQr={setQrJob} />}
+
       {activeJob && <ActiveJobCard job={activeJob} onAdvance={advance} busy={busyId === activeJob.id} />}
 
       <section className="space-y-4">
@@ -174,7 +223,9 @@ export default function PartnerAppPage() {
           <div className="flex items-center gap-2">
             <h3 className="font-display text-base font-bold text-slate-900">Nearby Shoot Requests</h3>
             {online && requests.length > 0 && (
-              <span className="rounded-full bg-brand-orange px-2 py-0.5 text-[11px] font-bold text-white">{requests.length} New</span>
+              <Badge tone="brand" size="md">
+                {requests.length} New
+              </Badge>
             )}
           </div>
           <span className="flex items-center gap-1 text-xs text-slate-500">
@@ -218,6 +269,8 @@ export default function PartnerAppPage() {
           </div>
         )}
       </section>
+
+      <WalletCard wallet={wallet} onChanged={reload} />
 
       <Card className="p-4 sm:p-6">
         <div className="mb-3 flex items-center gap-2">

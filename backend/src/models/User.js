@@ -15,6 +15,7 @@ const creatorProfileSchema = new mongoose.Schema(
     isOnline: { type: Boolean, default: false },
     isVerified: { type: Boolean, default: true },
     rating: { type: Number, min: 0, max: 5, default: 5 },
+    upiId: { type: String, trim: true, lowercase: true, maxlength: 100, default: '' },
   },
   { _id: false }
 );

@@ -3,7 +3,8 @@ import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { serializeBooking } from '../utils/serializers.js';
-import { ACCOUNT_STATUS, ACTIVE_JOB_STATUSES, BOOKING_STATUS, ROLES } from '../constants/roles.js';
+import { ACCOUNT_STATUS, ACTIVE_JOB_STATUSES, BOOKING_STATUS, PAYMENT_STATUS, ROLES } from '../constants/roles.js';
+import { ADMIN_EVENTS, BOOKING_EVENTS } from '../constants/events.js';
 import { forceLogout, notifyAdmins, notifyBookingChange } from '../socket/index.js';
 import { accountNotice } from '../utils/accountStatus.js';
 
@@ -98,6 +99,7 @@ export const listBookings = asyncHandler(async (req, res) => {
 
   const filter = {};
   if (status === 'active') filter.status = { $in: [BOOKING_STATUS.SEARCHING, ...ACTIVE_JOB_STATUSES] };
+  else if (status === 'unpaid') filter['payment.status'] = PAYMENT_STATUS.DUE;
   else if (status !== 'all') filter.status = status;
 
   if (q) {
@@ -227,7 +229,7 @@ export const cancelBooking = asyncHandler(async (req, res) => {
   );
   if (!booking) throw ApiError.conflict('Only open or in-progress bookings can be cancelled');
 
-  notifyBookingChange(booking, 'booking:cancelled');
+  notifyBookingChange(booking, BOOKING_EVENTS.CANCELLED);
   res.json({ success: true, booking: serializeBooking(booking) });
 });
 
@@ -253,7 +255,7 @@ export const updateUserStatus = asyncHandler(async (req, res) => {
         open.map(async (b) => {
           Object.assign(b, { status: BOOKING_STATUS.CANCELLED, cancelledAt: new Date(), cancelledBy: 'superadmin' });
           await b.save();
-          notifyBookingChange(b, 'booking:cancelled');
+          notifyBookingChange(b, BOOKING_EVENTS.CANCELLED);
         })
       );
       cancelledRequests = open.length;
@@ -261,7 +263,7 @@ export const updateUserStatus = asyncHandler(async (req, res) => {
     forceLogout(user._id.toString(), accountNotice(user));
   }
 
-  notifyAdmins('user:status', { userId: user._id.toString(), status });
+  notifyAdmins(ADMIN_EVENTS.USER_STATUS, { userId: user._id.toString(), status });
   res.json({
     success: true,
     user: { id: user._id.toString(), name: user.name, role: user.role, ...accountFields(user) },

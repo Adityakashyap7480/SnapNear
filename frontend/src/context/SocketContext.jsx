@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { SOCKET_URL } from '../config/constants';
+import { APP_EVENTS, SOCKET_EVENTS } from '../config/events';
 import { useAuth } from './AuthContext';
 
 const SocketContext = createContext({ socket: null, connected: false });
@@ -16,8 +17,8 @@ export function SocketProvider({ children }) {
     const s = io(SOCKET_URL, { auth: { token }, transports: ['websocket', 'polling'] });
     s.on('connect', () => setConnected(true));
     s.on('disconnect', () => setConnected(false));
-    s.on('account:restricted', (notice) => {
-      window.dispatchEvent(new CustomEvent('snapnear:account-restricted', { detail: notice }));
+    s.on(SOCKET_EVENTS.ACCOUNT_RESTRICTED, (notice) => {
+      window.dispatchEvent(new CustomEvent(APP_EVENTS.ACCOUNT_RESTRICTED, { detail: notice }));
     });
     setSocket(s);
 

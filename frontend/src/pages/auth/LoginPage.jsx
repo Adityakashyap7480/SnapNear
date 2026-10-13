@@ -8,6 +8,8 @@ import Button from '../../components/ui/Button';
 import { Input, PasswordInput } from '../../components/ui/FormField';
 import { useAuth } from '../../context/AuthContext';
 import { ROLE_HOME } from '../../config/constants';
+import { ROUTES } from '../../config/routes';
+import { MESSAGES, isValidEmail } from '../../utils/validators';
 
 const PORTALS = [
   { icon: CalendarPlus, label: 'Customers', color: 'text-brand-orange bg-orange-50' },
@@ -32,7 +34,7 @@ export default function LoginPage() {
 
   const validate = () => {
     const next = {};
-    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = 'Enter a valid email address';
+    if (!isValidEmail(form.email)) next.email = MESSAGES.EMAIL;
     if (!form.password) next.password = 'Password is required';
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -122,14 +124,14 @@ export default function LoginPage() {
 
       <div className="grid grid-cols-2 gap-3">
         <Link
-          to="/signup?role=customer"
+          to={`${ROUTES.SIGNUP}?role=customer`}
           className="rounded-xl border border-slate-200 p-3 text-center transition hover:border-brand-orange hover:bg-orange-50/50"
         >
           <p className="text-xs font-bold text-slate-900">Book a shoot</p>
           <p className="text-[11px] text-slate-500">Create customer account</p>
         </Link>
         <Link
-          to="/signup?role=partner"
+          to={`${ROUTES.SIGNUP}?role=partner`}
           className="rounded-xl border border-slate-200 p-3 text-center transition hover:border-brand-violet hover:bg-indigo-50/50"
         >
           <p className="text-xs font-bold text-slate-900">Become a partner</p>

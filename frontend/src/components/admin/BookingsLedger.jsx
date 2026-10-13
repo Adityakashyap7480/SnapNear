@@ -4,23 +4,26 @@ import toast from 'react-hot-toast';
 import Card, { EmptyState } from '../ui/Card';
 import StatusBadge from '../ui/StatusBadge';
 import Spinner from '../ui/Spinner';
+import PaymentBadge from '../payment/PaymentBadge';
 import { SearchInput } from '../ui/FormField';
 import { adminApi } from '../../api/services';
 import useAdminLive from '../../hooks/useAdminLive';
-import { isActive } from '../../utils/bookingStatus';
+import { BOOKING_FILTER } from '../../config/constants';
+import { isActive, isCompleted, isSearching } from '../../utils/bookingStatus';
 import { formatDate, formatDateTime, formatINR } from '../../utils/format';
 
 const DEFAULT_TABS = [
-  { id: 'all', label: 'All' },
-  { id: 'active', label: 'Live / Active' },
-  { id: 'completed', label: 'Completed' },
-  { id: 'cancelled', label: 'Cancelled' },
+  { id: BOOKING_FILTER.ALL, label: 'All' },
+  { id: BOOKING_FILTER.ACTIVE, label: 'Live / Active' },
+  { id: BOOKING_FILTER.COMPLETED, label: 'Completed' },
+  { id: BOOKING_FILTER.UNPAID, label: 'Payment Due' },
+  { id: BOOKING_FILTER.CANCELLED, label: 'Cancelled' },
 ];
 
 export default function BookingsLedger({
   title = 'Live Commission Ledger',
   subtitle = 'Every booking: who booked (customer) and who shot it (partner)',
-  initialStatus = 'all',
+  initialStatus = BOOKING_FILTER.ALL,
   tabs = DEFAULT_TABS,
   pageSize = 15,
 }) {
@@ -129,7 +132,7 @@ export default function BookingsLedger({
         ) : (
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {bookings.map((b) => {
-              const counted = b.status === 'completed';
+              const counted = isCompleted(b.status);
               return (
                 <li key={b.id} className="rounded-xl border border-slate-200 p-3.5">
                   <div className="flex items-start justify-between gap-2">
@@ -142,8 +145,11 @@ export default function BookingsLedger({
                         Booked {formatDateTime(b.createdAt)} &bull; Shoot {formatDate(b.shootDate)}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <StatusBadge status={b.status} pulse={b.status === 'searching'} />
+                    <div className="flex shrink-0 items-start gap-1">
+                      <div className="flex flex-col items-end gap-1">
+                        <StatusBadge status={b.status} pulse={isSearching(b.status)} />
+                        <PaymentBadge payment={b.payment} />
+                      </div>
                       {cancelButton(b)}
                     </div>
                   </div>
@@ -164,7 +170,7 @@ export default function BookingsLedger({
                         </>
                       ) : (
                         <p className="text-[11px] text-slate-400 italic">
-                          {b.status === 'searching' ? 'Awaiting...' : '—'}
+                          {isSearching(b.status) ? 'Awaiting...' : '—'}
                         </p>
                       )}
                     </div>
@@ -226,7 +232,7 @@ export default function BookingsLedger({
               </tr>
             ) : (
               bookings.map((b) => {
-                const counted = b.status === 'completed';
+                const counted = isCompleted(b.status);
                 return (
                   <tr key={b.id} className="transition hover:bg-slate-50">
                     <td className="p-3">
@@ -245,7 +251,7 @@ export default function BookingsLedger({
                         </>
                       ) : (
                         <span className="text-[11px] text-slate-400 italic">
-                          {b.status === 'searching' ? 'Awaiting partner...' : '—'}
+                          {isSearching(b.status) ? 'Awaiting partner...' : '—'}
                         </span>
                       )}
                     </td>
@@ -266,7 +272,10 @@ export default function BookingsLedger({
                       {formatINR(b.platformFee, { fixed: true })}
                     </td>
                     <td className="p-3">
-                      <StatusBadge status={b.status} pulse={b.status === 'searching'} />
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusBadge status={b.status} pulse={isSearching(b.status)} />
+                        <PaymentBadge payment={b.payment} />
+                      </div>
                     </td>
                     <td className="p-3 text-right">{cancelButton(b)}</td>
                   </tr>

@@ -1,8 +1,8 @@
 import { Ban, Clock, Mail } from 'lucide-react';
-import { SUPPORT_EMAIL } from '../../config/constants';
+import { ACCOUNT_STATUS, SUPPORT_EMAIL } from '../../config/constants';
 
 const VARIANTS = {
-  suspended: {
+  [ACCOUNT_STATUS.SUSPENDED]: {
     icon: Clock,
     title: 'Account suspended',
     box: 'border-amber-200 bg-amber-50',
@@ -10,7 +10,7 @@ const VARIANTS = {
     titleColor: 'text-amber-900',
     button: 'bg-amber-600 hover:bg-amber-700 focus-visible:ring-amber-500/40',
   },
-  blocked: {
+  [ACCOUNT_STATUS.BLOCKED]: {
     icon: Ban,
     title: 'Account blocked',
     box: 'border-red-200 bg-red-50',
@@ -33,7 +33,7 @@ function supportMailto(supportEmail, status, email) {
 }
 
 export default function AccountNotice({ notice }) {
-  const status = notice.account?.status === 'blocked' ? 'blocked' : 'suspended';
+  const status = notice.account?.status === ACCOUNT_STATUS.BLOCKED ? ACCOUNT_STATUS.BLOCKED : ACCOUNT_STATUS.SUSPENDED;
   const v = VARIANTS[status];
   const Icon = v.icon;
   const supportEmail = notice.account?.supportEmail || SUPPORT_EMAIL;

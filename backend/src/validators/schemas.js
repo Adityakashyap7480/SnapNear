@@ -63,6 +63,27 @@ export const updateCreatorProfileSchema = z.object({
   experienceYears: z.coerce.number().min(0).max(50).optional(),
   gear: z.string().trim().max(200).optional(),
   bio: z.string().trim().max(300).optional(),
+  upiId: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9._-]{2,256}@[a-z][a-z0-9.]{1,63}$/, 'Enter a valid UPI ID, e.g. name@okaxis')
+    .optional(),
+});
+
+const razorpayId = (prefix, label) =>
+  z.string().trim().regex(new RegExp(`^${prefix}_[A-Za-z0-9]{6,40}$`), `Invalid ${label}`);
+
+export const verifyPaymentSchema = z.object({
+  orderId: razorpayId('order', 'order id'),
+  paymentId: razorpayId('pay', 'payment id'),
+  signature: z.string().trim().regex(/^[a-f0-9]{64}$/, 'Invalid payment signature'),
+});
+
+export const markPayoutSchema = z.object({
+  creatorId: z.string().regex(/^[a-f0-9]{24}$/, 'Invalid partner'),
+  reference: z.string().trim().max(80, 'Keep the reference under 80 characters').optional().default(''),
+  note: z.string().trim().max(200, 'Keep the note under 200 characters').optional().default(''),
 });
 
 export const updateUserStatusSchema = z.object({
@@ -72,7 +93,7 @@ export const updateUserStatusSchema = z.object({
 
 export const adminBookingQuerySchema = z.object({
   status: z
-    .enum(['all', 'searching', 'assigned', 'arrived', 'shooting', 'completed', 'cancelled', 'active'])
+    .enum(['all', 'searching', 'assigned', 'arrived', 'shooting', 'completed', 'cancelled', 'active', 'unpaid'])
     .optional()
     .default('all'),
   q: z.string().trim().max(80).optional().default(''),

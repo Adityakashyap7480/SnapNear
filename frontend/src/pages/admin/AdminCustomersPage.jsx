@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Activity, IndianRupee, User, Users } from 'lucide-react';
 import Card, { EmptyState, StatCard } from '../../components/ui/Card';
 import Avatar from '../../components/ui/Avatar';
+import Badge from '../../components/ui/Badge';
 import { SearchInput } from '../../components/ui/FormField';
 import { PageLoader } from '../../components/ui/Spinner';
 import PageHeader from '../../components/admin/PageHeader';
@@ -79,9 +80,7 @@ export default function AdminCustomersPage() {
                     </p>
                   </div>
                   {c.active > 0 && (
-                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                      {c.active} live
-                    </span>
+                    <Badge tone="amber">{c.active} live</Badge>
                   )}
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-slate-50 p-2.5 text-center">
@@ -156,7 +155,7 @@ export default function AdminCustomersPage() {
                     <td className="px-3 py-3 text-center font-bold text-slate-900">{c.bookings}</td>
                     <td className="px-3 py-3 text-center">
                       {c.active > 0 ? (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">{c.active}</span>
+                        <Badge tone="amber">{c.active}</Badge>
                       ) : (
                         '—'
                       )}

@@ -1,35 +1,46 @@
-import http from './http';
+import { request } from './client';
+import { API_ENDPOINTS } from './endpoints';
+
+const { AUTH, CATALOG, BOOKINGS, CREATOR, ADMIN } = API_ENDPOINTS;
+const byId = (id) => ({ pathParams: { id } });
 
 export const authApi = {
-  login: (payload) => http.post('/auth/login', payload),
-  signup: (payload) => http.post('/auth/signup', payload),
-  me: () => http.get('/auth/me'),
+  login: (data) => request(AUTH.LOGIN, { data }),
+  signup: (data) => request(AUTH.SIGNUP, { data }),
+  me: () => request(AUTH.ME),
 };
 
 export const catalogApi = {
-  get: () => http.get('/catalog'),
+  get: () => request(CATALOG.GET),
 };
 
 export const bookingApi = {
-  create: (payload) => http.post('/bookings', payload),
-  mine: () => http.get('/bookings/mine'),
-  cancel: (id) => http.patch(`/bookings/${id}/cancel`),
+  create: (data) => request(BOOKINGS.CREATE, { data }),
+  mine: () => request(BOOKINGS.MINE),
+  cancel: (id) => request(BOOKINGS.CANCEL, byId(id)),
+  startPayment: (id) => request(BOOKINGS.START_PAYMENT, byId(id)),
+  verifyPayment: (id, data) => request(BOOKINGS.VERIFY_PAYMENT, { ...byId(id), data }),
+  paymentStatus: (id) => request(BOOKINGS.PAYMENT_STATUS, byId(id)),
 };
 
 export const creatorApi = {
-  dashboard: () => http.get('/creator/dashboard'),
-  setDuty: (isOnline) => http.patch('/creator/status', { isOnline }),
-  updateProfile: (payload) => http.patch('/creator/profile', payload),
-  accept: (id) => http.post(`/creator/requests/${id}/accept`),
-  decline: (id) => http.post(`/creator/requests/${id}/decline`),
-  advance: (id) => http.patch(`/creator/jobs/${id}/advance`),
+  dashboard: () => request(CREATOR.DASHBOARD),
+  setDuty: (isOnline) => request(CREATOR.SET_DUTY, { data: { isOnline } }),
+  updateProfile: (data) => request(CREATOR.UPDATE_PROFILE, { data }),
+  accept: (id) => request(CREATOR.ACCEPT_REQUEST, byId(id)),
+  decline: (id) => request(CREATOR.DECLINE_REQUEST, byId(id)),
+  advance: (id) => request(CREATOR.ADVANCE_JOB, byId(id)),
+  collectLink: (id) => request(CREATOR.COLLECT_LINK, byId(id)),
+  paymentStatus: (id) => request(CREATOR.PAYMENT_STATUS, byId(id)),
 };
 
 export const adminApi = {
-  overview: () => http.get('/admin/overview'),
-  bookings: (params) => http.get('/admin/bookings', { params }),
-  cancelBooking: (id) => http.patch(`/admin/bookings/${id}/cancel`),
-  clients: () => http.get('/admin/clients'),
-  creators: () => http.get('/admin/creators'),
-  setUserStatus: (id, payload) => http.patch(`/admin/users/${id}/status`, payload),
+  overview: () => request(ADMIN.OVERVIEW),
+  bookings: (params) => request(ADMIN.BOOKINGS, { params }),
+  cancelBooking: (id) => request(ADMIN.CANCEL_BOOKING, byId(id)),
+  clients: () => request(ADMIN.CLIENTS),
+  creators: () => request(ADMIN.CREATORS),
+  setUserStatus: (id, data) => request(ADMIN.SET_USER_STATUS, { ...byId(id), data }),
+  payouts: () => request(ADMIN.PAYOUTS),
+  markPayout: (data) => request(ADMIN.MARK_PAYOUT, { data }),
 };

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { authApi } from '../api/services';
 import { TOKEN_KEY } from '../config/constants';
+import { APP_EVENTS } from '../config/events';
 
 const AuthContext = createContext(null);
 
@@ -51,11 +52,11 @@ export function AuthProvider({ children }) {
       setAccountNotice((prev) => ({ ...e.detail, email: userRef.current?.email || prev?.email }));
       logout();
     };
-    window.addEventListener('snapnear:unauthorized', onUnauthorized);
-    window.addEventListener('snapnear:account-restricted', onRestricted);
+    window.addEventListener(APP_EVENTS.UNAUTHORIZED, onUnauthorized);
+    window.addEventListener(APP_EVENTS.ACCOUNT_RESTRICTED, onRestricted);
     return () => {
-      window.removeEventListener('snapnear:unauthorized', onUnauthorized);
-      window.removeEventListener('snapnear:account-restricted', onRestricted);
+      window.removeEventListener(APP_EVENTS.UNAUTHORIZED, onUnauthorized);
+      window.removeEventListener(APP_EVENTS.ACCOUNT_RESTRICTED, onRestricted);
     };
   }, [logout]);
 

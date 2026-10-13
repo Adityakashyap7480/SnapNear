@@ -19,6 +19,17 @@ export const BOOKING_STATUS = {
   CANCELLED: 'cancelled',
 };
 
+// Payment is requested only once a shoot is completed; older bookings have no payment status.
+export const PAYMENT_STATUS = {
+  DUE: 'due',
+  PAID: 'paid',
+};
+
+export const SETTLEMENT_STATUS = {
+  PENDING: 'pending',
+  PAID: 'paid',
+};
+
 export const ACTIVE_JOB_STATUSES = [
   BOOKING_STATUS.ASSIGNED,
   BOOKING_STATUS.ARRIVED,

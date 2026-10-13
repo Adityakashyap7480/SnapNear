@@ -5,6 +5,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import { signToken } from '../utils/token.js';
 import superAdmin from '../config/superAdmin.js';
 import { ROLES } from '../constants/roles.js';
+import { ADMIN_EVENTS } from '../constants/events.js';
 import { notifyAdmins } from '../socket/index.js';
 import { assertAccountActive } from '../utils/accountStatus.js';
 
@@ -35,7 +36,7 @@ export const signup = asyncHandler(async (req, res) => {
         : undefined,
   });
 
-  notifyAdmins('user:new', { role: user.role, name: user.name });
+  notifyAdmins(ADMIN_EVENTS.USER_NEW, { role: user.role, name: user.name });
 
   res.status(201).json({
     success: true,

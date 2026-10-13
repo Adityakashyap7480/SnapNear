@@ -7,9 +7,10 @@ import {
   listCreators,
   updateUserStatus,
 } from '../controllers/admin.controller.js';
+import { listPayouts, markPayoutPaid } from '../controllers/payout.controller.js';
 import { authorize, protect } from '../middleware/auth.js';
 import validate from '../middleware/validate.js';
-import { adminBookingQuerySchema, updateUserStatusSchema } from '../validators/schemas.js';
+import { adminBookingQuerySchema, markPayoutSchema, updateUserStatusSchema } from '../validators/schemas.js';
 import { ROLES } from '../constants/roles.js';
 
 const router = Router();
@@ -22,5 +23,7 @@ router.patch('/bookings/:id/cancel', cancelBooking);
 router.get('/clients', listClients);
 router.get('/creators', listCreators);
 router.patch('/users/:id/status', validate(updateUserStatusSchema), updateUserStatus);
+router.get('/payouts', listPayouts);
+router.post('/payouts', validate(markPayoutSchema), markPayoutPaid);
 
 export default router;

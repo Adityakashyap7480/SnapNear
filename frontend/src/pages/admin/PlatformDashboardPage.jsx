@@ -64,7 +64,7 @@ export default function PlatformDashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard tone="amber" icon={IndianRupee} label="Gross Booking Volume" value={formatINR(o.gross, { fixed: true })} hint={`${o.completedCount} completed shoots • total customer payments`} />
-        <StatCard tone="emerald" icon={Wallet} label="Partner Payouts (80%)" value={formatINR(o.creatorTotal, { fixed: true })} hint="Settled to photographers & videographers" />
+        <StatCard tone="emerald" icon={Wallet} label="Partner Payouts (80%)" value={formatINR(o.creatorTotal, { fixed: true })} hint="Partners' share of completed shoots" />
         <StatCard tone="navy" icon={Landmark} label="Platform Retained (20%)" value={formatINR(o.platformTotal, { fixed: true })} hint={`Your net revenue • ${take}% effective take`} />
       </div>
 

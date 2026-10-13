@@ -1,13 +1,14 @@
 import { Check, MessageCircle, Navigation, PhoneCall } from 'lucide-react';
 import Button from '../ui/Button';
+import { BOOKING_STATUS } from '../../config/constants';
 import { CREATOR_NEXT_ACTION, STATUS_META } from '../../utils/bookingStatus';
 import { formatDate, formatINR, maskPhone } from '../../utils/format';
 
 const STEPS = [
-  { key: 'assigned', label: 'Heading to customer' },
-  { key: 'arrived', label: 'Reached venue' },
-  { key: 'shooting', label: 'Shoot started' },
-  { key: 'completed', label: 'Completed' },
+  { key: BOOKING_STATUS.ASSIGNED, label: 'Heading to customer' },
+  { key: BOOKING_STATUS.ARRIVED, label: 'Reached venue' },
+  { key: BOOKING_STATUS.SHOOTING, label: 'Shoot started' },
+  { key: BOOKING_STATUS.COMPLETED, label: 'Completed' },
 ];
 
 export default function ActiveJobCard({ job, onAdvance, busy }) {

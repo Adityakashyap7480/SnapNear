@@ -1,8 +1,10 @@
 import { EmptyState } from '../ui/Card';
 import StatusBadge from '../ui/StatusBadge';
+import PaymentBadge from '../payment/PaymentBadge';
+import { isCompleted } from '../../utils/bookingStatus';
 import { formatDate, formatINR } from '../../utils/format';
 
-const payout = (h) => (h.status === 'completed' ? formatINR(h.creatorPayout, { fixed: true }) : '—');
+const payout = (h) => (isCompleted(h.status) ? formatINR(h.creatorPayout, { fixed: true }) : '—');
 
 export default function JobHistory({ history }) {
   if (history.length === 0) {
@@ -21,7 +23,10 @@ export default function JobHistory({ history }) {
                   {h.code} &bull; {h.occasion} &bull; {h.durationLabel}
                 </p>
               </div>
-              <StatusBadge status={h.status} />
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <StatusBadge status={h.status} />
+                <PaymentBadge payment={h.payment} />
+              </div>
             </div>
             <div className="mt-1.5 flex items-center justify-between text-xs">
               <span className="text-slate-500">{formatDate(h.completedAt || h.shootDate)}</span>
@@ -54,7 +59,10 @@ export default function JobHistory({ history }) {
                 <td className="py-2.5 pr-3">{formatDate(h.completedAt || h.shootDate)}</td>
                 <td className="py-2.5 pr-3 text-right font-bold text-emerald-600">{payout(h)}</td>
                 <td className="py-2.5 text-right">
-                  <StatusBadge status={h.status} />
+                  <div className="flex items-center justify-end gap-1.5">
+                    <PaymentBadge payment={h.payment} />
+                    <StatusBadge status={h.status} />
+                  </div>
                 </td>
               </tr>
             ))}

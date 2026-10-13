@@ -1,5 +1,6 @@
 import { CalendarClock, MapPin } from 'lucide-react';
 import StatusBadge from '../ui/StatusBadge';
+import PaymentBadge from '../payment/PaymentBadge';
 import { EmptyState } from '../ui/Card';
 import { OCCASION_EMOJI } from '../../utils/bookingStatus';
 import { formatDate, formatINR, timeAgo } from '../../utils/format';
@@ -44,6 +45,7 @@ export default function BookingHistory({ bookings, selectedId, onSelect }) {
                 </span>
                 <div className="flex shrink-0 items-center gap-2">
                   <span className="text-[10px] text-slate-400">{timeAgo(b.createdAt)}</span>
+                  <PaymentBadge payment={b.payment} />
                   <StatusBadge status={b.status} />
                 </div>
               </div>

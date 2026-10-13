@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import env from '../config/env.js';
 import { verifyToken } from '../utils/token.js';
 import { ROLES } from '../constants/roles.js';
+import { SOCKET_EVENTS } from '../constants/events.js';
 import User from '../models/User.js';
 import { isRestricted } from '../utils/accountStatus.js';
 
@@ -70,20 +71,24 @@ export function notifyBookingChange(booking, event) {
   const clientId = (booking.client?._id || booking.client)?.toString();
   const creatorId = (booking.creator?._id || booking.creator)?.toString();
 
-  if (clientId) emit(rooms.user(clientId), 'booking:update', payload);
-  if (creatorId) emit(rooms.user(creatorId), 'booking:update', payload);
-  emit(rooms.creators, 'feed:update', payload);
-  emit(rooms.admins, 'admin:update', payload);
+  if (clientId) emit(rooms.user(clientId), SOCKET_EVENTS.BOOKING_UPDATE, payload);
+  if (creatorId) emit(rooms.user(creatorId), SOCKET_EVENTS.BOOKING_UPDATE, payload);
+  emit(rooms.creators, SOCKET_EVENTS.FEED_UPDATE, payload);
+  emit(rooms.admins, SOCKET_EVENTS.ADMIN_UPDATE, payload);
 }
 
 export function notifyAdmins(event, payload = {}) {
-  emit(rooms.admins, 'admin:update', { event, ...payload });
+  emit(rooms.admins, SOCKET_EVENTS.ADMIN_UPDATE, { event, ...payload });
+}
+
+export function notifyUser(userId, event, payload = {}) {
+  emit(rooms.user(userId.toString()), event, payload);
 }
 
 /** Tells every open session of a user why they were signed out, then drops those connections. */
 export function forceLogout(userId, notice) {
   if (!io) return;
   const room = rooms.user(userId);
-  io.to(room).emit('account:restricted', notice);
+  io.to(room).emit(SOCKET_EVENTS.ACCOUNT_RESTRICTED, notice);
   setTimeout(() => io.in(room).disconnectSockets(true), 500);
 }

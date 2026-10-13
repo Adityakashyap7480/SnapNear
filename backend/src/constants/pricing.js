@@ -1,3 +1,5 @@
+import env from '../config/env.js';
+
 export const CREATOR_SHARE = 0.8;
 export const PLATFORM_SHARE = 0.2;
 
@@ -6,15 +8,25 @@ export const SERVICE_TYPES = {
   video: { id: 'video', label: 'Video & Cinema' },
 };
 
+// Testing only: SHOOT_TEST_MINUTES turns this package into an N-minute shoot (label, timer and all)
+const TEST_TIER_ID = '1hr';
+const testMinutes = env.shootTestMinutes;
+
 // Shoot length per package; the on-site timer counts down from this once the shoot starts
 export const DURATION_MINUTES = {
   '1hr': 60,
   '2hr': 120,
   '4hr': 240,
   '1day': 480,
+  ...(testMinutes ? { [TEST_TIER_ID]: testMinutes } : {}),
 };
 
-export const PRICING_TIERS = {
+const withTestMode = (tier) =>
+  testMinutes && tier.id === TEST_TIER_ID
+    ? { ...tier, label: `${testMinutes} Min${testMinutes === 1 ? '' : 's'}`, subtitle: 'Test shoot' }
+    : tier;
+
+const BASE_PRICING_TIERS = {
   photo: [
     { id: '1hr', label: '1 Hour', subtitle: 'Quick Solo / Insta', total: 500 },
     { id: '2hr', label: '2 Hours', subtitle: 'Birthdays / Family', total: 900 },
@@ -28,6 +40,10 @@ export const PRICING_TIERS = {
     { id: '1day', label: '1 Day', subtitle: 'Full Day Cinematography (8 hrs)', total: 5000 },
   ],
 };
+
+export const PRICING_TIERS = Object.fromEntries(
+  Object.entries(BASE_PRICING_TIERS).map(([type, tiers]) => [type, tiers.map(withTestMode)])
+);
 
 export const OCCASIONS = [
   'Birthday Celebration',

@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import env from '../config/env.js';
 import { DURATION_MINUTES } from '../constants/pricing.js';
 
 export const START_OTP_LENGTH = 4;
@@ -16,5 +15,4 @@ export function isStartOtpMatch(expected, given) {
   return a.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-export const shootMinutesFor = (booking) =>
-  env.shootTestMinutes || booking.durationMinutes || DURATION_MINUTES[booking.durationId] || 60;
+export const shootMinutesFor = (booking) => booking.durationMinutes || DURATION_MINUTES[booking.durationId] || 60;

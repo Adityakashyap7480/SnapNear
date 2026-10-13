@@ -4,20 +4,22 @@ import Badge from '../ui/Badge';
 import StatusBadge from '../ui/StatusBadge';
 import Button from '../ui/Button';
 import PayNowPanel from '../payment/PayNowPanel';
+import StartOtpPanel from '../shoot/StartOtpPanel';
+import ShootTimer from '../shoot/ShootTimer';
 import { BOOKING_STATUS } from '../../config/constants';
 import { STATUS_META, isCompleted, isSearching } from '../../utils/bookingStatus';
 import { formatDate, formatINR } from '../../utils/format';
 
 const STEP_TEXT = {
   [BOOKING_STATUS.ASSIGNED]: { label: 'Photographer is heading to your location', eta: 'ETA ~15 mins' },
-  [BOOKING_STATUS.ARRIVED]: { label: 'Photographer arrived at your doorstep', eta: 'Setting up gear' },
-  [BOOKING_STATUS.SHOOTING]: { label: 'Session in progress 📸', eta: 'Live shoot active' },
+  [BOOKING_STATUS.ARRIVED]: { label: 'Photographer arrived at your doorstep', eta: 'Share OTP to start' },
+  [BOOKING_STATUS.SHOOTING]: { label: 'Session in progress 📸', eta: 'Timer running' },
   [BOOKING_STATUS.COMPLETED]: { label: 'Shoot completed 🎉', eta: 'Done' },
 };
 
 const CANCELLABLE = [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.ASSIGNED];
 
-export default function LiveStatusCard({ booking, onCancel, cancelling, onPay, paying }) {
+export default function LiveStatusCard({ booking, onCancel, cancelling, onPay, paying, onRefreshOtp, refreshingOtp }) {
   if (!booking) {
     return (
       <div id="booking-status" className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -112,6 +114,9 @@ export default function LiveStatusCard({ booking, onCancel, cancelling, onPay, p
               </div>
             </div>
           )}
+
+          {status === BOOKING_STATUS.ARRIVED && <StartOtpPanel booking={booking} onRefresh={onRefreshOtp} refreshing={refreshingOtp} />}
+          {status === BOOKING_STATUS.SHOOTING && booking.endsAt && <ShootTimer booking={booking} />}
 
           {!completed && creator.phone && (
             <div className="flex gap-2">

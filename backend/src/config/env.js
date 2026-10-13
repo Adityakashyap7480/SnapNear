@@ -19,6 +19,8 @@ const env = {
     webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET?.trim() || '',
   },
   payoutHoldDays: Number(process.env.PAYOUT_HOLD_DAYS) || 7,
+  // Testing only: forces every shoot timer to this many minutes. Leave unset in real use.
+  shootTestMinutes: Math.max(0, Number(process.env.SHOOT_TEST_MINUTES) || 0),
 };
 
 env.isProduction = env.nodeEnv === 'production';

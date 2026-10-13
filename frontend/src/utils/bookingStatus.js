@@ -53,9 +53,9 @@ export const isActive = (status) => ACTIVE_STATUSES.includes(status);
 export const isSearching = (status) => status === SEARCHING;
 export const isCompleted = (status) => status === COMPLETED;
 
+// ARRIVED -> SHOOTING happens through the customer's start OTP, not a button
 export const CREATOR_NEXT_ACTION = {
   [ASSIGNED]: { label: 'Reached Venue', next: ARRIVED },
-  [ARRIVED]: { label: 'Start Shoot', next: SHOOTING },
   [SHOOTING]: { label: 'Mark Completed', next: COMPLETED },
 };
 

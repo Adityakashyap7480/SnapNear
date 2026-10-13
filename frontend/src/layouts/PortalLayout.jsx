@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { Banknote, Briefcase, CalendarPlus, ChevronDown, LogOut, PieChart, ShieldCheck, Users, Wifi, WifiOff } from 'lucide-react';
 import Logo from '../components/ui/Logo';
 import Avatar from '../components/ui/Avatar';
+import AdminShootAlerts from '../components/admin/AdminShootAlerts';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { APP_NAMES, ROLE_LABELS, ROLES } from '../config/constants';
@@ -80,6 +81,7 @@ export default function PortalLayout() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      {user.role === ROLES.SUPER_ADMIN && <AdminShootAlerts />}
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
           <div className="min-w-0">

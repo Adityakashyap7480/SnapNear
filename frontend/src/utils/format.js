@@ -30,6 +30,11 @@ export function formatDateTime(value) {
   });
 }
 
+export function formatTime(value) {
+  if (!value) return '—';
+  return new Date(value).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+}
+
 export function timeAgo(value) {
   if (!value) return '';
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
@@ -55,5 +60,24 @@ export const initials = (name = '') =>
     .slice(0, 2)
     .map((p) => p[0].toUpperCase())
     .join('') || 'SN';
+
+/** 3725000 -> "1:02:05", 59000 -> "00:59" */
+export function formatClock(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+/** 60 -> "1 hour", 480 -> "8 hours", 90 -> "1 hr 30 min" */
+export function formatMinutes(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (!h) return `${m} min`;
+  if (!m) return `${h} hour${h === 1 ? '' : 's'}`;
+  return `${h} hr ${m} min`;
+}
 
 export const maskPhone = (phone = '') => (phone ? `+91 ${phone.slice(0, 5)} ${phone.slice(5)}` : '—');

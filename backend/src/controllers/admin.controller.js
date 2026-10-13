@@ -14,6 +14,8 @@ const accountFields = (u) => ({
   statusChangedAt: u.statusChangedAt || null,
 });
 
+const LIVE_SHOOTS_LIMIT = 20;
+
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const daysAgo = (n) => {
@@ -24,7 +26,7 @@ const daysAgo = (n) => {
 };
 
 export const getOverview = asyncHandler(async (_req, res) => {
-  const [completedAgg, statusAgg, todayAgg, dailyAgg, clients, creators, onlineCreators] = await Promise.all([
+  const [completedAgg, statusAgg, todayAgg, dailyAgg, clients, creators, onlineCreators, liveShoots] = await Promise.all([
     Booking.aggregate([
       { $match: { status: BOOKING_STATUS.COMPLETED } },
       {
@@ -56,6 +58,10 @@ export const getOverview = asyncHandler(async (_req, res) => {
     User.countDocuments({ role: ROLES.CLIENT }),
     User.countDocuments({ role: ROLES.CREATOR }),
     User.countDocuments({ role: ROLES.CREATOR, 'creatorProfile.isOnline': true }),
+    Booking.find({ status: BOOKING_STATUS.SHOOTING })
+      .sort({ endsAt: 1 })
+      .limit(LIVE_SHOOTS_LIMIT)
+      .populate('creator', 'name phone email creatorProfile'),
   ]);
 
   const byStatus = Object.fromEntries(Object.values(BOOKING_STATUS).map((s) => [s, { count: 0, value: 0 }]));
@@ -90,6 +96,7 @@ export const getOverview = asyncHandler(async (_req, res) => {
       totalBookings: statusAgg.reduce((n, s) => n + s.count, 0),
       users: { clients, creators, onlineCreators },
       last7Days,
+      liveShoots: liveShoots.map((b) => serializeBooking(b)),
     },
   });
 });

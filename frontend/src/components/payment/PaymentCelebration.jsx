@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import confetti from 'canvas-confetti';
 import { Check, ShieldCheck, Wallet } from 'lucide-react';
 import { formatINR } from '../../utils/format';
-import { playChime } from '../../utils/sound';
+import { playChime, vibrate } from '../../utils/sound';
 import { paymentMethodLabel } from '../../utils/payment';
 
 const COLORS = ['#ff8008', '#ffc837', '#10b981', '#6366f1', '#f43f5e', '#ffffff'];
@@ -93,7 +93,7 @@ export default function PaymentCelebration({ celebration, onClose }) {
       setOpened(true);
       playChime('success');
       fireConfetti();
-      navigator.vibrate?.([60, 40, 120]);
+      vibrate([60, 40, 120]);
     }, OPEN_DELAY_MS);
     return () => {
       clearTimeout(timer);

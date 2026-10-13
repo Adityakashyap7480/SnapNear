@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { BadgeCheck, CheckCheck, History, IndianRupee, Locate, Power, Radar, Star, Wallet, Camera, Landmark } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Card, { EmptyState, StatCard } from '../../components/ui/Card';
@@ -12,13 +12,17 @@ import CollectPaymentCard from '../../components/partner/CollectPaymentCard';
 import PaymentQrModal from '../../components/partner/PaymentQrModal';
 import WalletCard from '../../components/partner/WalletCard';
 import PaymentCelebration from '../../components/payment/PaymentCelebration';
+import TimeUpAlert from '../../components/shoot/TimeUpAlert';
 import { creatorApi } from '../../api/services';
 import { useSocketEvent } from '../../context/SocketContext';
 import { BOOKING_EVENTS, SOCKET_EVENTS } from '../../config/events';
+import { BOOKING_STATUS } from '../../config/constants';
 import useAsync from '../../hooks/useAsync';
+import useShootAlerts from '../../hooks/useShootAlerts';
 import { CREATOR_NEXT_ACTION, isCompleted } from '../../utils/bookingStatus';
-import { formatINR } from '../../utils/format';
-import { playChime } from '../../utils/sound';
+import { formatClock, formatINR, formatMinutes } from '../../utils/format';
+import { serverNow } from '../../utils/serverClock';
+import { playChime, vibrate } from '../../utils/sound';
 
 export default function PartnerAppPage() {
   const { data, setData, loading, error, reload } = useAsync(() => creatorApi.dashboard(), []);
@@ -50,6 +54,9 @@ export default function PartnerAppPage() {
   );
   const closeQr = useCallback(() => setQrJob(null), []);
   const closeCelebration = useCallback(() => setCelebration(null), []);
+
+  const activeJobs = useMemo(() => (data?.activeJob ? [data.activeJob] : []), [data?.activeJob]);
+  const { alertBooking: timeUpJob, dismiss: dismissTimeUp } = useShootAlerts(activeJobs, 'partner');
 
   useSocketEvent(SOCKET_EVENTS.FEED_UPDATE, async (payload) => {
     const fresh = await reload();
@@ -126,13 +133,19 @@ export default function PartnerAppPage() {
     }
   };
 
-  const advance = async (job) => {
+  const advance = async (job, { confirmEarly = true } = {}) => {
+    const left = job.status === BOOKING_STATUS.SHOOTING && job.endsAt ? new Date(job.endsAt).getTime() - serverNow() : 0;
+    if (confirmEarly && left > 60 * 1000 && !window.confirm(`${formatClock(left)} of booked time is still left. Mark the shoot completed now?`)) {
+      return;
+    }
     setBusyId(job.id);
     try {
       const { booking } = await creatorApi.advance(job.id);
       playChime('ping');
       if (isCompleted(booking.status)) {
         toast.success(`Shoot completed! Collect ${formatINR(booking.total)} from the customer via SnapNear.`, { duration: 6000 });
+      } else if (booking.status === BOOKING_STATUS.ARRIVED) {
+        toast.success(`You've arrived! Ask ${booking.client?.name?.split(' ')[0] || 'the customer'} for the start OTP.`, { duration: 6000 });
       } else {
         toast.success(`Status updated: ${CREATOR_NEXT_ACTION[job.status].label}`);
       }
@@ -144,10 +157,34 @@ export default function PartnerAppPage() {
     }
   };
 
+  // Errors are shown inside the OTP form, so they propagate to it.
+  const startShoot = async (job, otp) => {
+    const { booking } = await creatorApi.startShoot(job.id, otp);
+    playChime('success');
+    vibrate([80, 40, 80]);
+    toast.success(`OTP verified! ${formatMinutes(booking.durationMinutes || 60)} shoot timer started.`, { duration: 6000 });
+    await reload();
+  };
+
+  const completeAfterTimeUp = async (job) => {
+    dismissTimeUp();
+    await advance(job, { confirmEarly: false });
+  };
+
   return (
     <div className="space-y-6">
       {celebration && <PaymentCelebration key={celebration.key} celebration={celebration} onClose={closeCelebration} />}
       {qrJob && <PaymentQrModal key={qrJob.id} job={qrJob} onClose={closeQr} onPaid={celebratePayment} />}
+      {timeUpJob && (
+        <TimeUpAlert
+          key={timeUpJob.id}
+          booking={timeUpJob}
+          role="partner"
+          onDismiss={dismissTimeUp}
+          onComplete={completeAfterTimeUp}
+          completing={busyId === timeUpJob.id}
+        />
+      )}
 
       <Card className="flex flex-col justify-between gap-4 p-4 sm:p-5 md:flex-row md:items-center">
         <div className="flex min-w-0 items-center gap-3.5">
@@ -216,7 +253,7 @@ export default function PartnerAppPage() {
 
       {awaitingPayment.length > 0 && <CollectPaymentCard jobs={awaitingPayment} onShowQr={setQrJob} />}
 
-      {activeJob && <ActiveJobCard job={activeJob} onAdvance={advance} busy={busyId === activeJob.id} />}
+      {activeJob && <ActiveJobCard job={activeJob} onAdvance={advance} onStartShoot={startShoot} busy={busyId === activeJob.id} />}
 
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">

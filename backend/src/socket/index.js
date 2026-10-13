@@ -74,7 +74,14 @@ export function notifyBookingChange(booking, event) {
   if (clientId) emit(rooms.user(clientId), SOCKET_EVENTS.BOOKING_UPDATE, payload);
   if (creatorId) emit(rooms.user(creatorId), SOCKET_EVENTS.BOOKING_UPDATE, payload);
   emit(rooms.creators, SOCKET_EVENTS.FEED_UPDATE, payload);
-  emit(rooms.admins, SOCKET_EVENTS.ADMIN_UPDATE, payload);
+  emit(rooms.admins, SOCKET_EVENTS.ADMIN_UPDATE, {
+    ...payload,
+    clientName: booking.clientSnapshot?.name || booking.contactName,
+    creatorName: booking.creatorSnapshot?.name || booking.creator?.name,
+    startedAt: booking.startedAt,
+    endsAt: booking.endsAt,
+    durationMinutes: booking.durationMinutes,
+  });
 }
 
 export function notifyAdmins(event, payload = {}) {

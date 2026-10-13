@@ -11,26 +11,31 @@ import FareCard from '../../components/booking/FareCard';
 import LiveStatusCard from '../../components/booking/LiveStatusCard';
 import BookingHistory from '../../components/booking/BookingHistory';
 import PaymentCelebration from '../../components/payment/PaymentCelebration';
+import TimeUpAlert from '../../components/shoot/TimeUpAlert';
 import { bookingApi } from '../../api/services';
 import { useAuth } from '../../context/AuthContext';
 import { useSocketEvent } from '../../context/SocketContext';
 import { BOOKING_EVENTS, SOCKET_EVENTS } from '../../config/events';
 import useCatalog from '../../hooks/useCatalog';
 import useAsync from '../../hooks/useAsync';
+import useShootAlerts from '../../hooks/useShootAlerts';
 import { BOOKING_STATUS } from '../../config/constants';
 import { isActive, isSearching } from '../../utils/bookingStatus';
-import { formatINR, todayISO } from '../../utils/format';
+import { formatINR, formatMinutes, todayISO } from '../../utils/format';
 import { isPaymentDue, openRazorpayCheckout } from '../../utils/payment';
 import { playChime } from '../../utils/sound';
 import { MESSAGES, isValidPhone } from '../../utils/validators';
 
 const EVENT_TOASTS = {
   [BOOKING_EVENTS.ACCEPTED]: (b) => `🎉 ${b.creator?.name || 'A photographer'} accepted your shoot!`,
-  [BOOKING_EVENTS.ARRIVED]: (b) => `📍 ${b.creator?.name || 'Your photographer'} has arrived at your doorstep`,
-  [BOOKING_EVENTS.SHOOTING]: () => '📸 Your shoot has started',
+  [BOOKING_EVENTS.ARRIVED]: (b) =>
+    `📍 ${b.creator?.name || 'Your photographer'} has arrived!${b.startOtp ? ` Share OTP ${b.startOtp} to start your shoot.` : ''}`,
+  [BOOKING_EVENTS.SHOOTING]: (b) => `📸 Your shoot has started! ${formatMinutes(b.durationMinutes || 60)} timer is running.`,
   [BOOKING_EVENTS.COMPLETED]: (b) => `✅ Shoot completed! Please pay ${formatINR(b.total)} to finish your booking.`,
   [BOOKING_EVENTS.CANCELLED]: () => 'Booking was cancelled',
 };
+
+const otpToastId = (bookingId) => `start-otp-${bookingId}`;
 
 const LIVE_HEADLINE = {
   [BOOKING_STATUS.ASSIGNED]: 'on the way!',
@@ -106,6 +111,8 @@ export default function BookShootPage() {
     });
   };
   const closeCelebration = useCallback(() => setCelebration(null), []);
+  const { alertBooking: timeUpBooking, dismiss: dismissTimeUp } = useShootAlerts(bookings, 'customer');
+  const [refreshingOtpId, setRefreshingOtpId] = useState(null);
 
   useSocketEvent(SOCKET_EVENTS.BOOKING_UPDATE, async (payload) => {
     const fresh = await reload();
@@ -116,16 +123,33 @@ export default function BookShootPage() {
       celebrate(b);
       return;
     }
-    if (payload.event === BOOKING_EVENTS.COMPLETED) {
+    if (payload.event === BOOKING_EVENTS.SHOOTING) toast.dismiss(otpToastId(b.id));
+    const spotlight = [BOOKING_EVENTS.ARRIVED, BOOKING_EVENTS.SHOOTING, BOOKING_EVENTS.COMPLETED].includes(payload.event);
+    if (spotlight) {
       setSelectedId(b.id);
       setTimeout(scrollToStatus, 150);
     }
     const message = EVENT_TOASTS[payload.event]?.(b);
     if (message) {
       playChime(payload.event === BOOKING_EVENTS.ACCEPTED ? 'broadcast' : 'ping');
-      toast(message, { icon: null, duration: payload.event === BOOKING_EVENTS.COMPLETED ? 7000 : 4000 });
+      const id = payload.event === BOOKING_EVENTS.ARRIVED ? otpToastId(b.id) : undefined;
+      toast(message, { id, icon: null, duration: spotlight ? 7000 : 4000 });
     }
   });
+
+  const refreshOtp = async (booking) => {
+    setRefreshingOtpId(booking.id);
+    try {
+      const { booking: updated } = await bookingApi.newStartOtp(booking.id);
+      setBookings((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+      toast.success(`New OTP: ${updated.startOtp}. Share it with your photographer.`, { id: otpToastId(updated.id) });
+    } catch (err) {
+      toast.error(err.message);
+      reload();
+    } finally {
+      setRefreshingOtpId(null);
+    }
+  };
 
   const pay = async (booking) => {
     setPayingId(booking.id);
@@ -211,6 +235,7 @@ export default function BookShootPage() {
   return (
     <div className="space-y-6">
       {celebration && <PaymentCelebration key={celebration.key} celebration={celebration} onClose={closeCelebration} />}
+      {timeUpBooking && <TimeUpAlert key={timeUpBooking.id} booking={timeUpBooking} role="customer" onDismiss={dismissTimeUp} />}
 
       {dueBooking && (
         <div className="flex animate-fade-up flex-col gap-3 rounded-2xl bg-gradient-to-r from-brand-orange to-amber-500 p-4 text-white shadow-lg sm:flex-row sm:items-center sm:justify-between">
@@ -248,7 +273,15 @@ export default function BookShootPage() {
                 {live.creator?.name} is{' '}
                 {LIVE_HEADLINE[live.status]}
               </h4>
-              <p className="truncate text-xs text-emerald-100">{live.address}</p>
+              <p className="truncate text-xs text-emerald-100">
+                {live.status === BOOKING_STATUS.ARRIVED && live.startOtp ? (
+                  <>
+                    Start OTP: <strong className="font-display text-sm tracking-[0.3em] text-white">{live.startOtp}</strong>
+                  </>
+                ) : (
+                  live.address
+                )}
+              </p>
             </div>
           </div>
           <button
@@ -344,6 +377,8 @@ export default function BookShootPage() {
             cancelling={cancellingId === focused?.id}
             onPay={pay}
             paying={payingId === focused?.id}
+            onRefreshOtp={refreshOtp}
+            refreshingOtp={refreshingOtpId === focused?.id}
           />
         </div>
       </div>

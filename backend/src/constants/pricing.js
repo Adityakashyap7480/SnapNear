@@ -6,18 +6,26 @@ export const SERVICE_TYPES = {
   video: { id: 'video', label: 'Video & Cinema' },
 };
 
+// Shoot length per package; the on-site timer counts down from this once the shoot starts
+export const DURATION_MINUTES = {
+  '1hr': 60,
+  '2hr': 120,
+  '4hr': 240,
+  '1day': 480,
+};
+
 export const PRICING_TIERS = {
   photo: [
     { id: '1hr', label: '1 Hour', subtitle: 'Quick Solo / Insta', total: 500 },
     { id: '2hr', label: '2 Hours', subtitle: 'Birthdays / Family', total: 900 },
     { id: '4hr', label: '4 Hours', subtitle: 'Half Day Party', total: 1600 },
-    { id: '1day', label: '1 Day', subtitle: 'Full Day Coverage', total: 3000 },
+    { id: '1day', label: '1 Day', subtitle: 'Full Day Coverage (8 hrs)', total: 3000 },
   ],
   video: [
     { id: '1hr', label: '1 Hour', subtitle: 'Reels & High-Def Video', total: 999 },
     { id: '2hr', label: '2 Hours', subtitle: 'Cinematic Coverage', total: 1500 },
     { id: '4hr', label: '4 Hours', subtitle: 'Half Day Cinema', total: 2500 },
-    { id: '1day', label: '1 Day', subtitle: 'Full Day Cinematography', total: 5000 },
+    { id: '1day', label: '1 Day', subtitle: 'Full Day Cinematography (8 hrs)', total: 5000 },
   ],
 };
 
@@ -53,6 +61,7 @@ export function getQuote(serviceType, durationId) {
     serviceLabel: SERVICE_TYPES[serviceType].label,
     durationId: tier.id,
     durationLabel: tier.label,
+    durationMinutes: DURATION_MINUTES[tier.id],
     total: tier.total,
     creatorPayout: round2(tier.total - platformFee),
     platformFee,

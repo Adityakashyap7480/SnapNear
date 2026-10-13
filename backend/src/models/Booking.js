@@ -24,6 +24,7 @@ const bookingSchema = new mongoose.Schema(
     serviceLabel: { type: String, required: true },
     durationId: { type: String, required: true },
     durationLabel: { type: String, required: true },
+    durationMinutes: { type: Number, min: 1 },
     occasion: { type: String, required: true },
 
     shootDate: { type: String, required: true },
@@ -48,7 +49,16 @@ const bookingSchema = new mongoose.Schema(
     acceptedAt: Date,
     arrivedAt: Date,
     startedAt: Date,
+    endsAt: Date,
     completedAt: Date,
+
+    // Issued when the partner reaches the venue; only the customer sees the code.
+    // The partner enters it to start the shoot, which also starts the countdown.
+    startOtp: {
+      code: { type: String, select: false },
+      attempts: Number,
+      issuedAt: Date,
+    },
     cancelledAt: Date,
     cancelledBy: { type: String, enum: ['client', 'superadmin'] },
 

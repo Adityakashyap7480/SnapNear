@@ -34,11 +34,60 @@ function tone(c, { freq, start, duration, type = 'sine', volume = 0.2 }) {
   osc.stop(start + duration + 0.02);
 }
 
+/** navigator.vibrate, skipped until the user has tapped (Chrome blocks and logs it otherwise). */
+export function vibrate(pattern) {
+  if (typeof navigator === 'undefined' || !navigator.vibrate) return;
+  if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+  navigator.vibrate(pattern);
+}
+
+function alarmPhrase(c) {
+  const now = c.currentTime + 0.02;
+  // Bright digital "beep-beep-beep-beep", then a short rising melody
+  for (let i = 0; i < 4; i += 1) {
+    tone(c, { freq: 1046.5, start: now + i * 0.16, duration: 0.11, type: 'square', volume: 0.12 });
+  }
+  [783.99, 987.77, 1174.66, 1567.98].forEach((freq, i) =>
+    tone(c, { freq, start: now + 0.8 + i * 0.14, duration: 0.24, type: 'triangle', volume: 0.22 })
+  );
+}
+
+const ALARM_REPEAT_MS = 1800;
+
+/** Loops an alarm until the returned stop() is called. */
+export function startAlarm() {
+  let timer = null;
+  try {
+    const c = getContext();
+    alarmPhrase(c);
+    timer = window.setInterval(() => {
+      try {
+        alarmPhrase(getContext());
+      } catch {
+        /* audio not available */
+      }
+    }, ALARM_REPEAT_MS);
+  } catch {
+    /* audio not available */
+  }
+  return () => {
+    if (timer) window.clearInterval(timer);
+    timer = null;
+  };
+}
+
 /** Small Web Audio chimes so alerts work without external audio files. */
 export function playChime(type = 'ping') {
   try {
     const c = getContext();
     const now = c.currentTime;
+
+    if (type === 'warning') {
+      // Two soft descending dings: "5 minutes left"
+      tone(c, { freq: 880, start: now, duration: 0.35, type: 'sine', volume: 0.22 });
+      tone(c, { freq: 659.25, start: now + 0.28, duration: 0.5, type: 'sine', volume: 0.2 });
+      return;
+    }
 
     if (type === 'success') {
       // Rising "ta-da" arpeggio followed by a coin sparkle

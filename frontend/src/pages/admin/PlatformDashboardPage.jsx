@@ -4,6 +4,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { PageLoader } from '../../components/ui/Spinner';
 import PageHeader from '../../components/admin/PageHeader';
 import BookingsLedger from '../../components/admin/BookingsLedger';
+import LiveShootsCard from '../../components/admin/LiveShootsCard';
 import { adminApi } from '../../api/services';
 import useAsync from '../../hooks/useAsync';
 import useAdminLive from '../../hooks/useAdminLive';
@@ -61,6 +62,8 @@ export default function PlatformDashboardPage() {
         subtitle="Your 20% platform fee vs 80% partner payouts across every customer booking, live."
         onRefresh={() => reload()}
       />
+
+      <LiveShootsCard shoots={o.liveShoots} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard tone="amber" icon={IndianRupee} label="Gross Booking Volume" value={formatINR(o.gross, { fixed: true })} hint={`${o.completedCount} completed shoots • total customer payments`} />

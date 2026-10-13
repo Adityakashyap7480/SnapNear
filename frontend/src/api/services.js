@@ -18,6 +18,7 @@ export const bookingApi = {
   create: (data) => request(BOOKINGS.CREATE, { data }),
   mine: () => request(BOOKINGS.MINE),
   cancel: (id) => request(BOOKINGS.CANCEL, byId(id)),
+  newStartOtp: (id) => request(BOOKINGS.NEW_START_OTP, byId(id)),
   startPayment: (id) => request(BOOKINGS.START_PAYMENT, byId(id)),
   verifyPayment: (id, data) => request(BOOKINGS.VERIFY_PAYMENT, { ...byId(id), data }),
   paymentStatus: (id) => request(BOOKINGS.PAYMENT_STATUS, byId(id)),
@@ -30,6 +31,7 @@ export const creatorApi = {
   accept: (id) => request(CREATOR.ACCEPT_REQUEST, byId(id)),
   decline: (id) => request(CREATOR.DECLINE_REQUEST, byId(id)),
   advance: (id) => request(CREATOR.ADVANCE_JOB, byId(id)),
+  startShoot: (id, otp) => request(CREATOR.START_SHOOT, { ...byId(id), data: { otp } }),
   collectLink: (id) => request(CREATOR.COLLECT_LINK, byId(id)),
   paymentStatus: (id) => request(CREATOR.PAYMENT_STATUS, byId(id)),
 };

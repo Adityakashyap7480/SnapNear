@@ -71,6 +71,10 @@ export const updateCreatorProfileSchema = z.object({
     .optional(),
 });
 
+export const startShootSchema = z.object({
+  otp: z.string().trim().regex(/^\d{4}$/, 'Enter the 4-digit OTP from the customer'),
+});
+
 const razorpayId = (prefix, label) =>
   z.string().trim().regex(new RegExp(`^${prefix}_[A-Za-z0-9]{6,40}$`), `Invalid ${label}`);
 

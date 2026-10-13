@@ -1,5 +1,7 @@
 import { Check, MessageCircle, Navigation, PhoneCall } from 'lucide-react';
 import Button from '../ui/Button';
+import StartShootForm from '../shoot/StartShootForm';
+import ShootTimer from '../shoot/ShootTimer';
 import { BOOKING_STATUS } from '../../config/constants';
 import { CREATOR_NEXT_ACTION, STATUS_META } from '../../utils/bookingStatus';
 import { formatDate, formatINR, maskPhone } from '../../utils/format';
@@ -11,7 +13,7 @@ const STEPS = [
   { key: BOOKING_STATUS.COMPLETED, label: 'Completed' },
 ];
 
-export default function ActiveJobCard({ job, onAdvance, busy }) {
+export default function ActiveJobCard({ job, onAdvance, onStartShoot, busy }) {
   const action = CREATOR_NEXT_ACTION[job.status];
   const currentIdx = STEPS.findIndex((s) => s.key === job.status);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}`;
@@ -39,6 +41,9 @@ export default function ActiveJobCard({ job, onAdvance, busy }) {
           </div>
         ))}
       </div>
+
+      {job.status === BOOKING_STATUS.ARRIVED && <StartShootForm job={job} onStart={onStartShoot} />}
+      {job.status === BOOKING_STATUS.SHOOTING && job.endsAt && <ShootTimer booking={job} tone="dark" />}
 
       <div className="grid grid-cols-1 gap-3 text-xs text-slate-300 sm:grid-cols-2">
         <p>

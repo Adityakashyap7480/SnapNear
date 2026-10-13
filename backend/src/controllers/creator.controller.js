@@ -15,6 +15,7 @@ import {
 import { ADMIN_EVENTS, BOOKING_EVENTS, BOOKING_EVENT_BY_STATUS } from '../constants/events.js';
 import { notifyAdmins, notifyBookingChange } from '../socket/index.js';
 import { isPaymentDue, syncPaymentQuietly } from '../services/payments.js';
+import { START_OTP_MAX_ATTEMPTS, isStartOtpMatch, newStartOtp, shootMinutesFor } from '../services/shootOtp.js';
 
 const TIMESTAMP_FOR_STATUS = {
   [BOOKING_STATUS.ARRIVED]: 'arrivedAt',
@@ -215,13 +216,69 @@ export const advanceJob = asyncHandler(async (req, res) => {
 
   const next = CREATOR_TRANSITIONS[booking.status];
   if (!next) throw ApiError.conflict(`Job is already ${booking.status}`);
+  if (next === BOOKING_STATUS.SHOOTING) {
+    throw ApiError.badRequest("Enter the customer's OTP to start the shoot");
+  }
 
   const update = { status: next, [TIMESTAMP_FOR_STATUS[next]]: new Date() };
+  if (next === BOOKING_STATUS.ARRIVED) update.startOtp = newStartOtp();
   if (next === BOOKING_STATUS.COMPLETED) update['payment.status'] = PAYMENT_STATUS.DUE;
 
   const updated = await Booking.findOneAndUpdate({ _id: booking._id, status: booking.status }, update, { new: true });
   if (!updated) throw ApiError.conflict('Job status changed, please refresh');
 
   notifyBookingChange(updated, BOOKING_EVENT_BY_STATUS[next]);
+  res.json({ success: true, booking: serializeBooking(updated) });
+});
+
+/** Partner enters the OTP the customer reads out; a match starts the shoot and its countdown. */
+export const startShoot = asyncHandler(async (req, res) => {
+  const creator = req.user.doc;
+  const booking = await Booking.findOne({ _id: req.params.id, creator: creator._id }).select('+startOtp.code');
+  if (!booking) throw ApiError.notFound('Job not found');
+
+  if (booking.status === BOOKING_STATUS.SHOOTING) throw ApiError.conflict('This shoot has already started');
+  if (booking.status !== BOOKING_STATUS.ARRIVED) {
+    throw ApiError.conflict('Tap "Reached Venue" when you arrive, then ask the customer for the OTP');
+  }
+  if (!booking.startOtp?.code) {
+    throw ApiError.conflict('Ask the customer to open SnapNear and tap "New OTP"');
+  }
+  if ((booking.startOtp.attempts || 0) >= START_OTP_MAX_ATTEMPTS) {
+    throw ApiError.tooManyRequests('Too many wrong OTPs. Ask the customer to tap "New OTP" in their SnapNear app.');
+  }
+
+  if (!isStartOtpMatch(booking.startOtp.code, req.body.otp)) {
+    const counted = await Booking.findOneAndUpdate(
+      { _id: booking._id, status: BOOKING_STATUS.ARRIVED },
+      { $inc: { 'startOtp.attempts': 1 } },
+      { new: true }
+    );
+    const left = Math.max(0, START_OTP_MAX_ATTEMPTS - (counted?.startOtp?.attempts || START_OTP_MAX_ATTEMPTS));
+    throw ApiError.badRequest(
+      left > 0
+        ? `Wrong OTP. ${left} attempt${left === 1 ? '' : 's'} left.`
+        : 'Wrong OTP. Ask the customer to tap "New OTP" in their SnapNear app.'
+    );
+  }
+
+  const startedAt = new Date();
+  const minutes = shootMinutesFor(booking);
+  const updated = await Booking.findOneAndUpdate(
+    { _id: booking._id, status: BOOKING_STATUS.ARRIVED, 'startOtp.code': booking.startOtp.code },
+    {
+      $set: {
+        status: BOOKING_STATUS.SHOOTING,
+        startedAt,
+        durationMinutes: minutes,
+        endsAt: new Date(startedAt.getTime() + minutes * 60 * 1000),
+      },
+      $unset: { startOtp: 1 },
+    },
+    { new: true }
+  );
+  if (!updated) throw ApiError.conflict('The OTP changed or the shoot already started. Please refresh.');
+
+  notifyBookingChange(updated, BOOKING_EVENTS.SHOOTING);
   res.json({ success: true, booking: serializeBooking(updated) });
 });

@@ -1,12 +1,14 @@
 import { BOOKING_STATUS } from '../constants/roles.js';
+import { DURATION_MINUTES } from '../constants/pricing.js';
 
 const idOf = (ref) => (ref && ref._id ? ref._id.toString() : ref ? ref.toString() : null);
 
 /**
  * Shapes a booking for API responses.
  * `hideClientContact` masks the client's phone for creators who have not accepted the job yet.
+ * `includeStartOtp` is only for the customer: the partner must hear the OTP from them.
  */
-export function serializeBooking(booking, { hideClientContact = false } = {}) {
+export function serializeBooking(booking, { hideClientContact = false, includeStartOtp = false } = {}) {
   const b = booking.toObject ? booking.toObject() : booking;
   const creator = b.creator && b.creator._id ? b.creator : null;
 
@@ -18,6 +20,7 @@ export function serializeBooking(booking, { hideClientContact = false } = {}) {
     serviceLabel: b.serviceLabel,
     durationId: b.durationId,
     durationLabel: b.durationLabel,
+    durationMinutes: b.durationMinutes || DURATION_MINUTES[b.durationId] || null,
     occasion: b.occasion,
     shootDate: b.shootDate,
     timeSlot: b.timeSlot,
@@ -47,6 +50,8 @@ export function serializeBooking(booking, { hideClientContact = false } = {}) {
     acceptedAt: b.acceptedAt,
     arrivedAt: b.arrivedAt,
     startedAt: b.startedAt,
+    endsAt: b.endsAt || null,
+    startOtp: includeStartOtp && b.status === BOOKING_STATUS.ARRIVED ? b.startOtp?.code || null : undefined,
     completedAt: b.completedAt,
     cancelledAt: b.cancelledAt,
     cancelledBy: b.cancelledBy,

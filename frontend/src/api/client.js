@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL, API_TIMEOUT_MS, TOKEN_KEY } from '../config/constants';
 import { APP_EVENTS } from '../config/events';
+import { syncServerTime } from '../utils/serverClock';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -14,7 +15,10 @@ apiClient.interceptors.request.use((config) => {
 });
 
 apiClient.interceptors.response.use(
-  (res) => res.data,
+  (res) => {
+    syncServerTime(res.headers?.['x-server-time']);
+    return res.data;
+  },
   (error) => {
     const status = error.response?.status;
     const data = error.response?.data || {};

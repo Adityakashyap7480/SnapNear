@@ -37,6 +37,10 @@ export const PAYMENT_STATUS = {
   PAID: 'paid',
 };
 
+// Must match backend/src/services/shootOtp.js
+export const START_OTP_LENGTH = 4;
+export const SHOOT_WARNING_MINUTES = 5;
+
 // Values the admin bookings API accepts as ?status= (see adminBookingQuerySchema)
 export const BOOKING_FILTER = {
   ALL: 'all',

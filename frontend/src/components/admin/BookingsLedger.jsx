@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, ChevronLeft, ChevronRight, Receipt, X } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Receipt, ShieldCheck, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Card, { EmptyState } from '../ui/Card';
 import StatusBadge from '../ui/StatusBadge';
@@ -10,7 +10,17 @@ import { adminApi } from '../../api/services';
 import useAdminLive from '../../hooks/useAdminLive';
 import { BOOKING_FILTER } from '../../config/constants';
 import { isActive, isCompleted, isSearching } from '../../utils/bookingStatus';
-import { formatDate, formatDateTime, formatINR } from '../../utils/format';
+import { formatDate, formatDateTime, formatINR, formatTime } from '../../utils/format';
+
+function OtpStartNote({ booking }) {
+  if (!booking.startedAt) return null;
+  return (
+    <p className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap text-emerald-700" title="Shoot started when the partner entered the customer's OTP">
+      <ShieldCheck className="h-3 w-3" /> OTP start {formatTime(booking.startedAt)}
+      {booking.endsAt && <span className="font-normal text-slate-400">&bull; ends {formatTime(booking.endsAt)}</span>}
+    </p>
+  );
+}
 
 const DEFAULT_TABS = [
   { id: BOOKING_FILTER.ALL, label: 'All' },
@@ -144,6 +154,7 @@ export default function BookingsLedger({
                       <p className="text-[10px] text-slate-400">
                         Booked {formatDateTime(b.createdAt)} &bull; Shoot {formatDate(b.shootDate)}
                       </p>
+                      <OtpStartNote booking={b} />
                     </div>
                     <div className="flex shrink-0 items-start gap-1">
                       <div className="flex flex-col items-end gap-1">
@@ -263,7 +274,10 @@ export default function BookingsLedger({
                         {b.occasion}
                       </p>
                     </td>
-                    <td className="p-3 whitespace-nowrap">{formatDate(b.shootDate)}</td>
+                    <td className="p-3 whitespace-nowrap">
+                      {formatDate(b.shootDate)}
+                      <OtpStartNote booking={b} />
+                    </td>
                     <td className="p-3 text-right font-bold text-slate-900">{formatINR(b.total)}</td>
                     <td className={`p-3 text-right font-semibold ${counted ? 'text-emerald-600' : 'text-slate-400'}`}>
                       {formatINR(b.creatorPayout, { fixed: true })}

@@ -23,7 +23,7 @@ export default function FareCard({ tier, serviceLabel, onBroadcast, submitting }
         <div className="space-y-2 rounded-xl border border-slate-700/60 bg-slate-800/70 p-3 text-xs">
           <div className="flex items-center justify-between font-medium text-emerald-400">
             <span className="flex items-center gap-1.5">
-              <CheckCircle className="h-3.5 w-3.5" /> Photographer Payout (80%)
+              <CheckCircle className="h-3.5 w-3.5" /> Photographer Payout
             </span>
             <span className="font-bold">{formatINR(tier?.creatorPayout, { fixed: true })}</span>
           </div>

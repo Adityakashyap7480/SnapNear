@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, Briefcase, CalendarPlus, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Lock, Mail } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AuthLayout from '../../layouts/AuthLayout';
 import AccountNotice from '../../components/auth/AccountNotice';
@@ -10,12 +10,6 @@ import { useAuth } from '../../context/AuthContext';
 import { ROLE_HOME } from '../../config/constants';
 import { ROUTES } from '../../config/routes';
 import { MESSAGES, isValidEmail } from '../../utils/validators';
-
-const PORTALS = [
-  { icon: CalendarPlus, label: 'Customers', color: 'text-brand-orange bg-orange-50' },
-  { icon: Briefcase, label: 'Partners', color: 'text-brand-violet bg-indigo-50' },
-  { icon: ShieldCheck, label: 'Owner', color: 'text-emerald-600 bg-emerald-50' },
-];
 
 export default function LoginPage() {
   const { login, accountNotice, setAccountNotice } = useAuth();
@@ -68,17 +62,6 @@ export default function LoginPage() {
         <p className="text-xs font-bold tracking-wider text-brand-orange uppercase">Welcome back</p>
         <h2 className="mt-1 font-display text-3xl font-extrabold tracking-tight text-slate-900">Log in to SnapNear</h2>
         <p className="mt-2 text-sm text-slate-500">One secure login for customers, photographer partners and the owner.</p>
-      </div>
-
-      <div className="mt-6 grid grid-cols-3 gap-2">
-        {PORTALS.map(({ icon: Icon, label, color }) => (
-          <div key={label} className="flex flex-col items-center gap-1.5 rounded-xl border border-slate-200 p-2.5 text-center">
-            <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${color}`}>
-              <Icon className="h-4 w-4" />
-            </span>
-            <span className="text-[11px] font-semibold text-slate-600">{label}</span>
-          </div>
-        ))}
       </div>
 
       <form onSubmit={onSubmit} noValidate className="mt-6 space-y-4">
@@ -135,7 +118,7 @@ export default function LoginPage() {
           className="rounded-xl border border-slate-200 p-3 text-center transition hover:border-brand-violet hover:bg-indigo-50/50"
         >
           <p className="text-xs font-bold text-slate-900">Become a partner</p>
-          <p className="text-[11px] text-slate-500">Earn 80% per shoot</p>
+          <p className="text-[11px] text-slate-500">Get paid shoots near you</p>
         </Link>
       </div>
     </AuthLayout>

@@ -13,6 +13,8 @@ import PaymentQrModal from '../../components/partner/PaymentQrModal';
 import WalletCard from '../../components/partner/WalletCard';
 import PaymentCelebration from '../../components/payment/PaymentCelebration';
 import TimeUpAlert from '../../components/shoot/TimeUpAlert';
+import PartnerTermsModal from '../../components/partner/PartnerTermsModal';
+import { useAuth } from '../../context/AuthContext';
 import { creatorApi } from '../../api/services';
 import { useSocketEvent } from '../../context/SocketContext';
 import { BOOKING_EVENTS, SOCKET_EVENTS } from '../../config/events';
@@ -25,6 +27,7 @@ import { serverNow } from '../../utils/serverClock';
 import { playChime, vibrate } from '../../utils/sound';
 
 export default function PartnerAppPage() {
+  const { user } = useAuth();
   const { data, setData, loading, error, reload } = useAsync(() => creatorApi.dashboard(), []);
   const [togglingDuty, setTogglingDuty] = useState(false);
   const [busyId, setBusyId] = useState(null);
@@ -173,6 +176,7 @@ export default function PartnerAppPage() {
 
   return (
     <div className="space-y-6">
+      {user?.needsPartnerTerms && <PartnerTermsModal />}
       {celebration && <PaymentCelebration key={celebration.key} celebration={celebration} onClose={closeCelebration} />}
       {qrJob && <PaymentQrModal key={qrJob.id} job={qrJob} onClose={closeQr} onPaid={celebratePayment} />}
       {timeUpJob && (

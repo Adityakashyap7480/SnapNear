@@ -21,10 +21,6 @@ export default function DurationTiles({ tiers = [], value, onChange }) {
               <span className="text-sm font-black text-slate-900">{formatINR(t.total)}</span>
             </div>
             <p className="truncate text-[10px] text-slate-500">{t.subtitle}</p>
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-x-1 border-t border-slate-100 pt-1 text-[9px]">
-              <span className="font-semibold text-emerald-700">Partner {formatINR(t.creatorPayout)}</span>
-              <span className="text-slate-400">20% fee</span>
-            </div>
           </button>
         );
       })}

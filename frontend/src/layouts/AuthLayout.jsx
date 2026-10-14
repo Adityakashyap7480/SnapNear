@@ -119,7 +119,7 @@ export default function AuthLayout({ children }) {
           <div className="w-full max-w-md animate-fade-up">{children}</div>
         </div>
         <p className="pb-6 text-center text-[11px] text-slate-400">
-          &copy; {new Date().getFullYear()} SnapNear Technologies &bull; 80% to partners &bull; 20% platform
+          &copy; {new Date().getFullYear()} SnapNear Technologies &bull; Verified photographers at your doorstep
         </p>
       </section>
     </div>

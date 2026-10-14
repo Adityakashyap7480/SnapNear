@@ -23,7 +23,7 @@ const ROLE_OPTIONS = [
     id: 'creator',
     icon: Briefcase,
     title: "I'm a photographer",
-    text: 'Accept nearby shoots, earn 80%',
+    text: 'Get paid shoots near you',
     active: 'border-brand-violet bg-indigo-50/70 ring-brand-violet',
     iconColor: 'bg-indigo-100 text-brand-violet',
   },

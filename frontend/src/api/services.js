@@ -30,6 +30,7 @@ export const creatorApi = {
   updateProfile: (data) => request(CREATOR.UPDATE_PROFILE, { data }),
   accept: (id) => request(CREATOR.ACCEPT_REQUEST, byId(id)),
   decline: (id) => request(CREATOR.DECLINE_REQUEST, byId(id)),
+  acceptTerms: () => request(CREATOR.ACCEPT_TERMS),
   advance: (id) => request(CREATOR.ADVANCE_JOB, byId(id)),
   startShoot: (id, otp) => request(CREATOR.START_SHOOT, { ...byId(id), data: { otp } }),
   collectLink: (id) => request(CREATOR.COLLECT_LINK, byId(id)),

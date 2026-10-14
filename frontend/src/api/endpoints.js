@@ -39,6 +39,7 @@ export const API_ENDPOINTS = Object.freeze({
     UPDATE_PROFILE: { method: PATCH, url: '/creator/profile' },
     ACCEPT_REQUEST: { method: POST, url: '/creator/requests/:id/accept' },
     DECLINE_REQUEST: { method: POST, url: '/creator/requests/:id/decline' },
+    ACCEPT_TERMS: { method: POST, url: '/creator/terms/accept' },
     ADVANCE_JOB: { method: PATCH, url: '/creator/jobs/:id/advance' },
     START_SHOOT: { method: POST, url: '/creator/jobs/:id/start' },
     COLLECT_LINK: { method: POST, url: '/creator/jobs/:id/collect' },

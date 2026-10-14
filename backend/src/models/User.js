@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { ACCOUNT_STATUS, ROLES } from '../constants/roles.js';
+import { PARTNER_TERMS_VERSION } from '../constants/terms.js';
 
 const creatorProfileSchema = new mongoose.Schema(
   {
@@ -16,6 +17,8 @@ const creatorProfileSchema = new mongoose.Schema(
     isVerified: { type: Boolean, default: true },
     rating: { type: Number, min: 0, max: 5, default: 5 },
     upiId: { type: String, trim: true, lowercase: true, maxlength: 100, default: '' },
+    termsVersion: { type: String, default: '' },
+    termsAcceptedAt: { type: Date },
   },
   { _id: false }
 );
@@ -62,6 +65,10 @@ userSchema.methods.comparePassword = function comparePassword(candidate) {
   return bcrypt.compare(candidate, this.password);
 };
 
+userSchema.methods.needsPartnerTerms = function needsPartnerTerms() {
+  return this.role === ROLES.CREATOR && this.creatorProfile?.termsVersion !== PARTNER_TERMS_VERSION;
+};
+
 userSchema.methods.toPublicJSON = function toPublicJSON() {
   return {
     id: this._id.toString(),
@@ -71,6 +78,7 @@ userSchema.methods.toPublicJSON = function toPublicJSON() {
     role: this.role,
     city: this.city,
     creatorProfile: this.role === ROLES.CREATOR ? this.creatorProfile : undefined,
+    needsPartnerTerms: this.needsPartnerTerms(),
     accountStatus: this.accountStatus || ACCOUNT_STATUS.ACTIVE,
     createdAt: this.createdAt,
   };

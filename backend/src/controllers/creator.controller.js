@@ -16,6 +16,7 @@ import { ADMIN_EVENTS, BOOKING_EVENTS, BOOKING_EVENT_BY_STATUS } from '../consta
 import { notifyAdmins, notifyBookingChange } from '../socket/index.js';
 import { isPaymentDue, syncPaymentQuietly } from '../services/payments.js';
 import { START_OTP_MAX_ATTEMPTS, isStartOtpMatch, newStartOtp, shootMinutesFor } from '../services/shootOtp.js';
+import { PARTNER_TERMS_VERSION } from '../constants/terms.js';
 
 const TIMESTAMP_FOR_STATUS = {
   [BOOKING_STATUS.ARRIVED]: 'arrivedAt',
@@ -148,8 +149,21 @@ export const getDashboard = asyncHandler(async (req, res) => {
   });
 });
 
+const TERMS_REQUIRED_MESSAGE = 'Please accept the SnapNear Partner Terms to continue';
+
+export const acceptTerms = asyncHandler(async (req, res) => {
+  const creator = req.user.doc;
+  if (creator.needsPartnerTerms()) {
+    creator.creatorProfile.termsVersion = PARTNER_TERMS_VERSION;
+    creator.creatorProfile.termsAcceptedAt = new Date();
+    await creator.save();
+  }
+  res.json({ success: true, user: creator.toPublicJSON() });
+});
+
 export const setDutyStatus = asyncHandler(async (req, res) => {
   const creator = req.user.doc;
+  if (req.body.isOnline && creator.needsPartnerTerms()) throw ApiError.forbidden(TERMS_REQUIRED_MESSAGE);
   creator.creatorProfile.isOnline = req.body.isOnline;
   await creator.save();
 
@@ -169,6 +183,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
 export const acceptRequest = asyncHandler(async (req, res) => {
   const creator = req.user.doc;
 
+  if (creator.needsPartnerTerms()) throw ApiError.forbidden(TERMS_REQUIRED_MESSAGE);
   if (!creator.creatorProfile?.isOnline) {
     throw ApiError.badRequest('Go online to accept shoot requests');
   }

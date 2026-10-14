@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   acceptRequest,
+  acceptTerms,
   advanceJob,
   declineRequest,
   getDashboard,
@@ -19,6 +20,7 @@ const router = Router();
 router.use(protect, authorize(ROLES.CREATOR));
 
 router.get('/dashboard', getDashboard);
+router.post('/terms/accept', acceptTerms);
 router.patch('/status', validate(dutyStatusSchema), setDutyStatus);
 router.patch('/profile', validate(updateCreatorProfileSchema), updateProfile);
 router.post('/requests/:id/accept', acceptRequest);

@@ -1,7 +1,7 @@
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { verifyToken } from '../utils/token.js';
-import User from '../models/User.js';
+import { findUserById, toPublicUser } from '../models/users.js';
 import superAdmin from '../config/superAdmin.js';
 import { ROLES } from '../constants/roles.js';
 import { assertAccountActive } from '../utils/accountStatus.js';
@@ -23,11 +23,11 @@ export const protect = asyncHandler(async (req, _res, next) => {
     return next();
   }
 
-  const user = await User.findById(payload.sub);
+  const user = await findUserById(payload.sub);
   if (!user) throw ApiError.unauthorized('Account no longer exists');
   assertAccountActive(user);
 
-  req.user = { ...user.toPublicJSON(), doc: user };
+  req.user = { ...toPublicUser(user), doc: user };
   return next();
 });
 

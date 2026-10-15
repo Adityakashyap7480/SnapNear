@@ -1,4 +1,7 @@
-import Booking from '../models/Booking.js';
+import { and, desc, eq, inArray } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { bookings } from '../db/schema.js';
+import { findBooking, updateBooking, withCreator, withCreators } from '../models/bookings.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { generateBookingCode } from '../utils/bookingCode.js';
@@ -11,7 +14,9 @@ import { isPaymentDue, syncPaymentQuietly } from '../services/payments.js';
 import { newStartOtp, shootMinutesFor } from '../services/shootOtp.js';
 
 const MAX_OPEN_BOOKINGS = 3;
-const CREATOR_FIELDS = 'name phone email creatorProfile';
+const OPEN_STATUSES = [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.ARRIVED, BOOKING_STATUS.SHOOTING];
+
+const ownBooking = (req) => and(eq(bookings.id, req.params.id), eq(bookings.clientId, req.user.doc.id));
 
 export const createBooking = asyncHandler(async (req, res) => {
   const client = req.user.doc;
@@ -25,41 +30,43 @@ export const createBooking = asyncHandler(async (req, res) => {
     throw ApiError.badRequest('Shoot date cannot be in the past');
   }
 
-  const unpaid = await Booking.findOne({ client: client._id, 'payment.status': PAYMENT_STATUS.DUE }).select('code total');
+  const unpaid = await findBooking(and(eq(bookings.clientId, client.id), eq(bookings.paymentStatus, PAYMENT_STATUS.DUE)));
   if (unpaid) {
     throw ApiError.conflict(
       `Please pay ₹${unpaid.total.toLocaleString('en-IN')} for your completed shoot ${unpaid.code} before booking a new one.`
     );
   }
 
-  const openCount = await Booking.countDocuments({
-    client: client._id,
-    status: { $in: [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.ARRIVED, BOOKING_STATUS.SHOOTING] },
-  });
+  const openCount = await db.$count(bookings, and(eq(bookings.clientId, client.id), inArray(bookings.status, OPEN_STATUSES)));
   if (openCount >= MAX_OPEN_BOOKINGS) {
     throw ApiError.conflict(`You can have at most ${MAX_OPEN_BOOKINGS} active bookings at a time`);
   }
 
-  const booking = await Booking.create({
-    code: await generateBookingCode(),
-    client: client._id,
-    clientSnapshot: { name: client.name, phone: client.phone, email: client.email },
-    serviceType: quote.serviceType,
-    serviceLabel: quote.serviceLabel,
-    durationId: quote.durationId,
-    durationLabel: quote.durationLabel,
-    durationMinutes: shootMinutesFor(quote),
-    occasion: data.occasion,
-    shootDate: data.shootDate,
-    timeSlot: data.timeSlot,
-    address: data.address,
-    contactName: data.contactName,
-    contactPhone: data.contactPhone,
-    notes: data.notes,
-    total: quote.total,
-    creatorPayout: quote.creatorPayout,
-    platformFee: quote.platformFee,
-  });
+  const [booking] = await db
+    .insert(bookings)
+    .values({
+      code: await generateBookingCode(),
+      clientId: client.id,
+      clientName: client.name,
+      clientPhone: client.phone,
+      clientEmail: client.email,
+      serviceType: quote.serviceType,
+      serviceLabel: quote.serviceLabel,
+      durationId: quote.durationId,
+      durationLabel: quote.durationLabel,
+      durationMinutes: shootMinutesFor(quote),
+      occasion: data.occasion,
+      shootDate: data.shootDate,
+      timeSlot: data.timeSlot,
+      address: data.address,
+      contactName: data.contactName,
+      contactPhone: data.contactPhone,
+      notes: data.notes,
+      total: quote.total,
+      creatorPayout: quote.creatorPayout,
+      platformFee: quote.platformFee,
+    })
+    .returning();
 
   notifyBookingChange(booking, BOOKING_EVENTS.CREATED);
 
@@ -67,59 +74,48 @@ export const createBooking = asyncHandler(async (req, res) => {
 });
 
 export const getMyBookings = asyncHandler(async (req, res) => {
-  const bookings = await Booking.find({ client: req.user.doc._id })
-    .select('+startOtp.code')
-    .sort({ createdAt: -1 })
-    .limit(50)
-    .populate('creator', CREATOR_FIELDS);
+  const list = await db
+    .select()
+    .from(bookings)
+    .where(eq(bookings.clientId, req.user.doc.id))
+    .orderBy(desc(bookings.createdAt))
+    .limit(50);
 
   const synced = await Promise.all(
-    bookings.map(async (b) => {
+    list.map(async (b) => {
       // A partner who arrived before OTPs existed still needs one to start
-      if (b.status === BOOKING_STATUS.ARRIVED && !b.startOtp?.code) {
-        b.startOtp = newStartOtp();
-        await b.save();
-        return b;
+      if (b.status === BOOKING_STATUS.ARRIVED && !b.startOtpCode) {
+        return (await updateBooking(eq(bookings.id, b.id), newStartOtp())) || b;
       }
       // Catch QR / link payments that completed while nobody was watching
-      if (!isPaymentDue(b) || (!b.payment.orderId && !b.payment.linkId)) return b;
-      const fresh = await syncPaymentQuietly(b);
-      return fresh === b ? b : fresh.populate('creator', CREATOR_FIELDS);
+      if (!isPaymentDue(b) || (!b.paymentOrderId && !b.paymentLinkId)) return b;
+      return syncPaymentQuietly(b);
     })
   );
 
-  res.json({ success: true, bookings: synced.map((b) => serializeBooking(b, { includeStartOtp: true })) });
+  const withPartners = await withCreators(synced);
+  res.json({ success: true, bookings: withPartners.map((b) => serializeBooking(b, { includeStartOtp: true })) });
 });
 
 /** Issues a fresh start OTP, e.g. after the partner typed the old one wrong too many times. */
 export const refreshStartOtp = asyncHandler(async (req, res) => {
-  const booking = await Booking.findOneAndUpdate(
-    { _id: req.params.id, client: req.user.doc._id, status: BOOKING_STATUS.ARRIVED },
-    { startOtp: newStartOtp() },
-    { new: true }
-  )
-    .select('+startOtp.code')
-    .populate('creator', CREATOR_FIELDS);
+  const booking = await updateBooking(and(ownBooking(req), eq(bookings.status, BOOKING_STATUS.ARRIVED)), newStartOtp());
 
   if (!booking) throw ApiError.conflict('A new OTP is available only after your photographer arrives');
-  res.json({ success: true, booking: serializeBooking(booking, { includeStartOtp: true }) });
+  res.json({ success: true, booking: serializeBooking(await withCreator(booking), { includeStartOtp: true }) });
 });
 
 export const cancelMyBooking = asyncHandler(async (req, res) => {
-  const booking = await Booking.findOneAndUpdate(
-    {
-      _id: req.params.id,
-      client: req.user.doc._id,
-      status: { $in: [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.ASSIGNED] },
-    },
-    { status: BOOKING_STATUS.CANCELLED, cancelledAt: new Date(), cancelledBy: 'client' },
-    { new: true }
-  ).populate('creator', CREATOR_FIELDS);
+  const booking = await updateBooking(
+    and(ownBooking(req), inArray(bookings.status, [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.ASSIGNED])),
+    { status: BOOKING_STATUS.CANCELLED, cancelledAt: new Date(), cancelledBy: 'client' }
+  );
 
   if (!booking) {
     throw ApiError.conflict('This booking can no longer be cancelled');
   }
 
-  notifyBookingChange(booking, BOOKING_EVENTS.CANCELLED);
-  res.json({ success: true, booking: serializeBooking(booking) });
+  const withPartner = await withCreator(booking);
+  notifyBookingChange(withPartner, BOOKING_EVENTS.CANCELLED);
+  res.json({ success: true, booking: serializeBooking(withPartner) });
 });

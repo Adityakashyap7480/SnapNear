@@ -3,7 +3,7 @@ import env from '../config/env.js';
 import { verifyToken } from '../utils/token.js';
 import { ROLES } from '../constants/roles.js';
 import { SOCKET_EVENTS } from '../constants/events.js';
-import User from '../models/User.js';
+import { findUserById } from '../models/users.js';
 import { isRestricted } from '../utils/accountStatus.js';
 
 let io = null;
@@ -25,7 +25,7 @@ export function initSocket(httpServer) {
       if (!token) return next(new Error('unauthorized'));
       const payload = verifyToken(token);
       if (payload.role !== ROLES.SUPER_ADMIN) {
-        const user = await User.findById(payload.sub).select('accountStatus').lean();
+        const user = await findUserById(payload.sub);
         if (!user || isRestricted(user)) return next(new Error('unauthorized'));
       }
       socket.data.userId = payload.sub;
@@ -58,7 +58,7 @@ function emit(room, event, payload) {
 export function notifyBookingChange(booking, event) {
   const payload = {
     event,
-    bookingId: booking._id.toString(),
+    bookingId: booking.id,
     code: booking.code,
     status: booking.status,
     serviceType: booking.serviceType,
@@ -68,16 +68,13 @@ export function notifyBookingChange(booking, event) {
     address: booking.address,
   };
 
-  const clientId = (booking.client?._id || booking.client)?.toString();
-  const creatorId = (booking.creator?._id || booking.creator)?.toString();
-
-  if (clientId) emit(rooms.user(clientId), SOCKET_EVENTS.BOOKING_UPDATE, payload);
-  if (creatorId) emit(rooms.user(creatorId), SOCKET_EVENTS.BOOKING_UPDATE, payload);
+  if (booking.clientId) emit(rooms.user(booking.clientId), SOCKET_EVENTS.BOOKING_UPDATE, payload);
+  if (booking.creatorId) emit(rooms.user(booking.creatorId), SOCKET_EVENTS.BOOKING_UPDATE, payload);
   emit(rooms.creators, SOCKET_EVENTS.FEED_UPDATE, payload);
   emit(rooms.admins, SOCKET_EVENTS.ADMIN_UPDATE, {
     ...payload,
-    clientName: booking.clientSnapshot?.name || booking.contactName,
-    creatorName: booking.creatorSnapshot?.name || booking.creator?.name,
+    clientName: booking.clientName || booking.contactName,
+    creatorName: booking.creatorName || booking.creator?.name,
     startedAt: booking.startedAt,
     endsAt: booking.endsAt,
     durationMinutes: booking.durationMinutes,
@@ -89,7 +86,7 @@ export function notifyAdmins(event, payload = {}) {
 }
 
 export function notifyUser(userId, event, payload = {}) {
-  emit(rooms.user(userId.toString()), event, payload);
+  emit(rooms.user(userId), event, payload);
 }
 
 /** Tells every open session of a user why they were signed out, then drops those connections. */

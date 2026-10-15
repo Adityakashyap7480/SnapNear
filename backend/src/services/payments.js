@@ -1,5 +1,7 @@
+import { and, eq, isNull } from 'drizzle-orm';
 import env from '../config/env.js';
-import Booking from '../models/Booking.js';
+import { bookings } from '../db/schema.js';
+import { findBookingById, updateBooking } from '../models/bookings.js';
 import ApiError from '../utils/ApiError.js';
 import { PAYMENT_STATUS, SETTLEMENT_STATUS } from '../constants/roles.js';
 import { BOOKING_EVENTS } from '../constants/events.js';
@@ -8,12 +10,12 @@ import * as razorpay from './razorpay.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const bookingNotes = (booking) => ({ bookingId: booking._id.toString(), code: booking.code });
+const bookingNotes = (booking) => ({ bookingId: booking.id, code: booking.code });
 
-export const isPaymentDue = (booking) => booking.payment?.status === PAYMENT_STATUS.DUE;
+export const isPaymentDue = (booking) => booking.paymentStatus === PAYMENT_STATUS.DUE;
 
 function assertDue(booking) {
-  if (booking.payment?.status === PAYMENT_STATUS.PAID) {
+  if (booking.paymentStatus === PAYMENT_STATUS.PAID) {
     throw ApiError.conflict('This shoot is already paid. Thank you!');
   }
   if (!isPaymentDue(booking)) {
@@ -27,26 +29,23 @@ function assertDue(booking) {
  */
 export async function finalizePayment(booking, payment, via) {
   const now = new Date();
-  const updated = await Booking.findOneAndUpdate(
-    { _id: booking._id, 'payment.status': PAYMENT_STATUS.DUE },
+  const updated = await updateBooking(
+    and(eq(bookings.id, booking.id), eq(bookings.paymentStatus, PAYMENT_STATUS.DUE)),
     {
-      $set: {
-        'payment.status': PAYMENT_STATUS.PAID,
-        'payment.paymentId': payment.id,
-        'payment.method': payment.method || '',
-        'payment.via': via,
-        'payment.paidAt': now,
-        'settlement.status': SETTLEMENT_STATUS.PENDING,
-        'settlement.eligibleAt': new Date(now.getTime() + env.payoutHoldDays * DAY_MS),
-      },
-    },
-    { new: true }
+      paymentStatus: PAYMENT_STATUS.PAID,
+      paymentId: payment.id,
+      paymentMethod: payment.method || '',
+      paymentVia: via,
+      paidAt: now,
+      settlementStatus: SETTLEMENT_STATUS.PENDING,
+      settlementEligibleAt: new Date(now.getTime() + env.payoutHoldDays * DAY_MS),
+    }
   );
 
   if (!updated) {
-    const current = await Booking.findById(booking._id);
+    const current = await findBookingById(booking.id);
     const isDuplicate =
-      current?.payment?.status === PAYMENT_STATUS.PAID && current.payment.paymentId && current.payment.paymentId !== payment.id;
+      current?.paymentStatus === PAYMENT_STATUS.PAID && current.paymentId && current.paymentId !== payment.id;
     if (isDuplicate) {
       try {
         await razorpay.refundPayment(payment.id, { reason: 'Duplicate payment', bookingCode: current.code });
@@ -58,8 +57,8 @@ export async function finalizePayment(booking, payment, via) {
     return current;
   }
 
-  if (via === 'app' && updated.payment.linkId) {
-    razorpay.cancelPaymentLink(updated.payment.linkId).catch(() => {});
+  if (via === 'app' && updated.paymentLinkId) {
+    razorpay.cancelPaymentLink(updated.paymentLinkId).catch(() => {});
   }
 
   notifyBookingChange(updated, BOOKING_EVENTS.PAID);
@@ -68,7 +67,7 @@ export async function finalizePayment(booking, payment, via) {
 
 async function findCapturedPayment(booking) {
   const expected = razorpay.toPaise(booking.total);
-  const { orderId, linkId } = booking.payment;
+  const { paymentOrderId: orderId, paymentLinkId: linkId } = booking;
 
   if (orderId) {
     const { items = [] } = await razorpay.fetchOrderPayments(orderId);
@@ -100,7 +99,7 @@ async function captureSafely(payment) {
 /** Asks Razorpay whether a due booking has been paid (used when no webhook reached us). */
 export async function syncPayment(booking) {
   if (!isPaymentDue(booking) || !razorpay.isRazorpayConfigured()) return booking;
-  if (!booking.payment.orderId && !booking.payment.linkId) return booking;
+  if (!booking.paymentOrderId && !booking.paymentLinkId) return booking;
 
   const found = await findCapturedPayment(booking);
   return found ? finalizePayment(booking, found.payment, found.via) : booking;
@@ -121,15 +120,13 @@ export async function createCheckout(booking) {
   const synced = await syncPayment(booking);
   assertDue(synced);
 
-  let orderId = synced.payment.orderId;
+  let orderId = synced.paymentOrderId;
   if (!orderId) {
     const order = await razorpay.createOrder({ amount: synced.total, receipt: synced.code, notes: bookingNotes(synced) });
-    const saved = await Booking.findOneAndUpdate(
-      { _id: synced._id, 'payment.orderId': { $exists: false } },
-      { $set: { 'payment.orderId': order.id } },
-      { new: true }
-    );
-    orderId = saved ? order.id : (await Booking.findById(synced._id)).payment.orderId;
+    const saved = await updateBooking(and(eq(bookings.id, synced.id), isNull(bookings.paymentOrderId)), {
+      paymentOrderId: order.id,
+    });
+    orderId = saved ? order.id : (await findBookingById(synced.id)).paymentOrderId;
   }
 
   return {
@@ -140,16 +137,16 @@ export async function createCheckout(booking) {
     name: 'SnapNear',
     description: `${synced.code} • ${synced.serviceLabel} (${synced.durationLabel})`,
     prefill: {
-      name: synced.clientSnapshot?.name || synced.contactName,
-      email: synced.clientSnapshot?.email || '',
-      contact: synced.contactPhone || synced.clientSnapshot?.phone || '',
+      name: synced.clientName || synced.contactName,
+      email: synced.clientEmail || '',
+      contact: synced.contactPhone || synced.clientPhone || '',
     },
     notes: bookingNotes(synced),
   };
 }
 
 export async function verifyCheckout(booking, { orderId, paymentId, signature }) {
-  if (!booking.payment?.orderId || orderId !== booking.payment.orderId) {
+  if (!booking.paymentOrderId || orderId !== booking.paymentOrderId) {
     throw ApiError.badRequest('This payment does not belong to this booking');
   }
   if (!razorpay.isCheckoutSignatureValid({ orderId, paymentId, signature })) {
@@ -172,8 +169,8 @@ export async function getCollectLink(booking) {
   const synced = await syncPayment(booking);
   assertDue(synced);
 
-  if (synced.payment.linkId && synced.payment.linkUrl) {
-    return { linkId: synced.payment.linkId, url: synced.payment.linkUrl };
+  if (synced.paymentLinkId && synced.paymentLinkUrl) {
+    return { linkId: synced.paymentLinkId, url: synced.paymentLinkUrl };
   }
 
   const link = await razorpay.createPaymentLink({
@@ -183,24 +180,23 @@ export async function getCollectLink(booking) {
     description: `SnapNear ${synced.code} • ${synced.serviceLabel} (${synced.durationLabel})`,
     reference_id: `${synced.code}-${Date.now().toString(36)}`,
     customer: {
-      name: synced.clientSnapshot?.name || synced.contactName,
+      name: synced.clientName || synced.contactName,
       contact: `+91${synced.contactPhone}`,
-      ...(synced.clientSnapshot?.email ? { email: synced.clientSnapshot.email } : {}),
+      ...(synced.clientEmail ? { email: synced.clientEmail } : {}),
     },
     notify: { sms: false, email: false },
     reminder_enable: false,
     notes: bookingNotes(synced),
   });
 
-  const saved = await Booking.findOneAndUpdate(
-    { _id: synced._id, 'payment.linkId': { $exists: false } },
-    { $set: { 'payment.linkId': link.id, 'payment.linkUrl': link.short_url } },
-    { new: true }
-  );
+  const saved = await updateBooking(and(eq(bookings.id, synced.id), isNull(bookings.paymentLinkId)), {
+    paymentLinkId: link.id,
+    paymentLinkUrl: link.short_url,
+  });
   if (!saved) {
     razorpay.cancelPaymentLink(link.id).catch(() => {});
-    const current = await Booking.findById(synced._id);
-    return { linkId: current.payment.linkId, url: current.payment.linkUrl };
+    const current = await findBookingById(synced.id);
+    return { linkId: current.paymentLinkId, url: current.paymentLinkUrl };
   }
   return { linkId: link.id, url: link.short_url };
 }

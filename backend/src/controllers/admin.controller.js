@@ -1,5 +1,9 @@
-import Booking from '../models/Booking.js';
-import User from '../models/User.js';
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, or, sql } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { bookings, creatorProfiles, users } from '../db/schema.js';
+import { countOf, likePattern, maxOf, sumOf } from '../db/aggregates.js';
+import { updateBooking, withCreators } from '../models/bookings.js';
+import { findUserById, listUsersWithProfiles, updateCreatorProfile, updateUser } from '../models/users.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { serializeBooking } from '../utils/serializers.js';
@@ -15,8 +19,9 @@ const accountFields = (u) => ({
 });
 
 const LIVE_SHOOTS_LIMIT = 20;
+const OPEN_OR_ACTIVE = [BOOKING_STATUS.SEARCHING, ...ACTIVE_JOB_STATUSES];
 
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const isCompleted = eq(bookings.status, BOOKING_STATUS.COMPLETED);
 
 const daysAgo = (n) => {
   const d = new Date();
@@ -26,55 +31,54 @@ const daysAgo = (n) => {
 };
 
 export const getOverview = asyncHandler(async (_req, res) => {
-  const [completedAgg, statusAgg, todayAgg, dailyAgg, clients, creators, onlineCreators, liveShoots] = await Promise.all([
-    Booking.aggregate([
-      { $match: { status: BOOKING_STATUS.COMPLETED } },
-      {
-        $group: {
-          _id: null,
-          count: { $sum: 1 },
-          gross: { $sum: '$total' },
-          creatorTotal: { $sum: '$creatorPayout' },
-          platformTotal: { $sum: '$platformFee' },
-        },
-      },
-    ]),
-    Booking.aggregate([{ $group: { _id: '$status', count: { $sum: 1 }, value: { $sum: '$total' } } }]),
-    Booking.aggregate([
-      { $match: { status: BOOKING_STATUS.COMPLETED, completedAt: { $gte: daysAgo(0) } } },
-      { $group: { _id: null, gross: { $sum: '$total' }, platform: { $sum: '$platformFee' }, count: { $sum: 1 } } },
-    ]),
-    Booking.aggregate([
-      { $match: { status: BOOKING_STATUS.COMPLETED, completedAt: { $gte: daysAgo(6) } } },
-      {
-        $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt', timezone: '+05:30' } },
-          gross: { $sum: '$total' },
-          platform: { $sum: '$platformFee' },
-          count: { $sum: 1 },
-        },
-      },
-    ]),
-    User.countDocuments({ role: ROLES.CLIENT }),
-    User.countDocuments({ role: ROLES.CREATOR }),
-    User.countDocuments({ role: ROLES.CREATOR, 'creatorProfile.isOnline': true }),
-    Booking.find({ status: BOOKING_STATUS.SHOOTING })
-      .sort({ endsAt: 1 })
+  const istDay = sql`to_char(${bookings.completedAt} at time zone 'Asia/Kolkata', 'YYYY-MM-DD')`;
+
+  const [[completed], statusRows, [today], dailyRows, clients, creators, onlineCreators, liveShoots] = await Promise.all([
+    db
+      .select({
+        count: countOf(),
+        gross: sumOf(bookings.total),
+        creatorTotal: sumOf(bookings.creatorPayout),
+        platformTotal: sumOf(bookings.platformFee),
+      })
+      .from(bookings)
+      .where(isCompleted),
+    db
+      .select({ status: bookings.status, count: countOf(), value: sumOf(bookings.total) })
+      .from(bookings)
+      .groupBy(bookings.status),
+    db
+      .select({ gross: sumOf(bookings.total), platform: sumOf(bookings.platformFee), count: countOf() })
+      .from(bookings)
+      .where(and(isCompleted, gte(bookings.completedAt, daysAgo(0)))),
+    db
+      .select({ date: istDay, gross: sumOf(bookings.total), platform: sumOf(bookings.platformFee), count: countOf() })
+      .from(bookings)
+      .where(and(isCompleted, gte(bookings.completedAt, daysAgo(6))))
+      .groupBy(istDay),
+    db.$count(users, eq(users.role, ROLES.CLIENT)),
+    db.$count(users, eq(users.role, ROLES.CREATOR)),
+    db.$count(creatorProfiles, eq(creatorProfiles.isOnline, true)),
+    db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.status, BOOKING_STATUS.SHOOTING))
+      .orderBy(asc(bookings.endsAt))
       .limit(LIVE_SHOOTS_LIMIT)
-      .populate('creator', 'name phone email creatorProfile'),
+      .then(withCreators),
   ]);
 
   const byStatus = Object.fromEntries(Object.values(BOOKING_STATUS).map((s) => [s, { count: 0, value: 0 }]));
-  statusAgg.forEach((s) => {
-    byStatus[s._id] = { count: s.count, value: s.value };
+  statusRows.forEach((s) => {
+    byStatus[s.status] = { count: s.count, value: s.value };
   });
 
-  const pipeline = [BOOKING_STATUS.SEARCHING, ...ACTIVE_JOB_STATUSES].reduce(
+  const pipeline = OPEN_OR_ACTIVE.reduce(
     (acc, s) => ({ count: acc.count + byStatus[s].count, value: acc.value + byStatus[s].value }),
     { count: 0, value: 0 }
   );
 
-  const dailyMap = Object.fromEntries(dailyAgg.map((d) => [d._id, d]));
+  const dailyMap = Object.fromEntries(dailyRows.map((d) => [d.date, d]));
   const last7Days = Array.from({ length: 7 }, (_, i) => {
     const date = daysAgo(6 - i);
     const key = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(date);
@@ -82,18 +86,17 @@ export const getOverview = asyncHandler(async (_req, res) => {
     return { date: key, gross: row?.gross || 0, platform: row?.platform || 0, count: row?.count || 0 };
   });
 
-  const completed = completedAgg[0] || {};
   res.json({
     success: true,
     overview: {
-      gross: completed.gross || 0,
-      creatorTotal: completed.creatorTotal || 0,
-      platformTotal: completed.platformTotal || 0,
-      completedCount: completed.count || 0,
-      today: { gross: todayAgg[0]?.gross || 0, platform: todayAgg[0]?.platform || 0, count: todayAgg[0]?.count || 0 },
+      gross: completed.gross,
+      creatorTotal: completed.creatorTotal,
+      platformTotal: completed.platformTotal,
+      completedCount: completed.count,
+      today,
       pipeline,
       byStatus,
-      totalBookings: statusAgg.reduce((n, s) => n + s.count, 0),
+      totalBookings: statusRows.reduce((n, s) => n + s.count, 0),
       users: { clients, creators, onlineCreators },
       last7Days,
       liveShoots: liveShoots.map((b) => serializeBooking(b)),
@@ -104,31 +107,37 @@ export const getOverview = asyncHandler(async (_req, res) => {
 export const listBookings = asyncHandler(async (req, res) => {
   const { status, q, page, limit } = req.validatedQuery;
 
-  const filter = {};
-  if (status === 'active') filter.status = { $in: [BOOKING_STATUS.SEARCHING, ...ACTIVE_JOB_STATUSES] };
-  else if (status === 'unpaid') filter['payment.status'] = PAYMENT_STATUS.DUE;
-  else if (status !== 'all') filter.status = status;
+  const filters = [];
+  if (status === 'active') filters.push(inArray(bookings.status, OPEN_OR_ACTIVE));
+  else if (status === 'unpaid') filters.push(eq(bookings.paymentStatus, PAYMENT_STATUS.DUE));
+  else if (status !== 'all') filters.push(eq(bookings.status, status));
 
   if (q) {
-    const rx = new RegExp(escapeRegex(q), 'i');
-    filter.$or = [
-      { code: rx },
-      { contactName: rx },
-      { contactPhone: rx },
-      { 'clientSnapshot.name': rx },
-      { 'clientSnapshot.email': rx },
-      { 'creatorSnapshot.name': rx },
-      { address: rx },
-    ];
+    const pattern = likePattern(q);
+    filters.push(
+      or(
+        ilike(bookings.code, pattern),
+        ilike(bookings.contactName, pattern),
+        ilike(bookings.contactPhone, pattern),
+        ilike(bookings.clientName, pattern),
+        ilike(bookings.clientEmail, pattern),
+        ilike(bookings.creatorName, pattern),
+        ilike(bookings.address, pattern)
+      )
+    );
   }
+  const where = and(...filters);
 
   const [items, total] = await Promise.all([
-    Booking.find(filter)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
+    db
+      .select()
+      .from(bookings)
+      .where(where)
+      .orderBy(desc(bookings.createdAt))
+      .offset((page - 1) * limit)
       .limit(limit)
-      .populate('creator', 'name phone email creatorProfile'),
-    Booking.countDocuments(filter),
+      .then(withCreators),
+    db.$count(bookings, where),
   ]);
 
   res.json({
@@ -140,32 +149,27 @@ export const listBookings = asyncHandler(async (req, res) => {
 
 export const listClients = asyncHandler(async (_req, res) => {
   const [clients, stats] = await Promise.all([
-    User.find({ role: ROLES.CLIENT }).sort({ createdAt: -1 }).lean(),
-    Booking.aggregate([
-      {
-        $group: {
-          _id: '$client',
-          bookings: { $sum: 1 },
-          completed: { $sum: { $cond: [{ $eq: ['$status', BOOKING_STATUS.COMPLETED] }, 1, 0] } },
-          active: {
-            $sum: {
-              $cond: [{ $in: ['$status', [BOOKING_STATUS.SEARCHING, ...ACTIVE_JOB_STATUSES]] }, 1, 0],
-            },
-          },
-          spent: { $sum: { $cond: [{ $eq: ['$status', BOOKING_STATUS.COMPLETED] }, '$total', 0] } },
-          lastBookingAt: { $max: '$createdAt' },
-        },
-      },
-    ]),
+    listUsersWithProfiles(eq(users.role, ROLES.CLIENT), desc(users.createdAt)),
+    db
+      .select({
+        clientId: bookings.clientId,
+        bookings: countOf(),
+        completed: countOf(isCompleted),
+        active: countOf(inArray(bookings.status, OPEN_OR_ACTIVE)),
+        spent: sumOf(bookings.total, isCompleted),
+        lastBookingAt: maxOf(bookings.createdAt),
+      })
+      .from(bookings)
+      .groupBy(bookings.clientId),
   ]);
 
-  const statMap = Object.fromEntries(stats.map((s) => [s._id.toString(), s]));
+  const statMap = Object.fromEntries(stats.map((s) => [s.clientId, s]));
   res.json({
     success: true,
     clients: clients.map((c) => {
-      const s = statMap[c._id.toString()] || {};
+      const s = statMap[c.id] || {};
       return {
-        id: c._id.toString(),
+        id: c.id,
         name: c.name,
         email: c.email,
         phone: c.phone,
@@ -184,29 +188,28 @@ export const listClients = asyncHandler(async (_req, res) => {
 
 export const listCreators = asyncHandler(async (_req, res) => {
   const [creators, stats] = await Promise.all([
-    User.find({ role: ROLES.CREATOR }).sort({ createdAt: -1 }).lean(),
-    Booking.aggregate([
-      { $match: { creator: { $ne: null } } },
-      {
-        $group: {
-          _id: '$creator',
-          accepted: { $sum: 1 },
-          completed: { $sum: { $cond: [{ $eq: ['$status', BOOKING_STATUS.COMPLETED] }, 1, 0] } },
-          active: { $sum: { $cond: [{ $in: ['$status', ACTIVE_JOB_STATUSES] }, 1, 0] } },
-          earnings: { $sum: { $cond: [{ $eq: ['$status', BOOKING_STATUS.COMPLETED] }, '$creatorPayout', 0] } },
-          platformFee: { $sum: { $cond: [{ $eq: ['$status', BOOKING_STATUS.COMPLETED] }, '$platformFee', 0] } },
-        },
-      },
-    ]),
+    listUsersWithProfiles(eq(users.role, ROLES.CREATOR), desc(users.createdAt)),
+    db
+      .select({
+        creatorId: bookings.creatorId,
+        accepted: countOf(),
+        completed: countOf(isCompleted),
+        active: countOf(inArray(bookings.status, ACTIVE_JOB_STATUSES)),
+        earnings: sumOf(bookings.creatorPayout, isCompleted),
+        platformFee: sumOf(bookings.platformFee, isCompleted),
+      })
+      .from(bookings)
+      .where(isNotNull(bookings.creatorId))
+      .groupBy(bookings.creatorId),
   ]);
 
-  const statMap = Object.fromEntries(stats.map((s) => [s._id.toString(), s]));
+  const statMap = Object.fromEntries(stats.map((s) => [s.creatorId, s]));
   res.json({
     success: true,
     creators: creators.map((c) => {
-      const s = statMap[c._id.toString()] || {};
+      const s = statMap[c.id] || {};
       return {
-        id: c._id.toString(),
+        id: c.id,
         name: c.name,
         email: c.email,
         phone: c.phone,
@@ -229,10 +232,9 @@ export const listCreators = asyncHandler(async (_req, res) => {
 });
 
 export const cancelBooking = asyncHandler(async (req, res) => {
-  const booking = await Booking.findOneAndUpdate(
-    { _id: req.params.id, status: { $in: [BOOKING_STATUS.SEARCHING, ...ACTIVE_JOB_STATUSES] } },
-    { status: BOOKING_STATUS.CANCELLED, cancelledAt: new Date(), cancelledBy: 'superadmin' },
-    { new: true }
+  const booking = await updateBooking(
+    and(eq(bookings.id, req.params.id), inArray(bookings.status, OPEN_OR_ACTIVE)),
+    { status: BOOKING_STATUS.CANCELLED, cancelledAt: new Date(), cancelledBy: 'superadmin' }
   );
   if (!booking) throw ApiError.conflict('Only open or in-progress bookings can be cancelled');
 
@@ -242,38 +244,38 @@ export const cancelBooking = asyncHandler(async (req, res) => {
 
 export const updateUserStatus = asyncHandler(async (req, res) => {
   const { status, reason } = req.body;
-  const user = await User.findById(req.params.id);
-  if (!user) throw ApiError.notFound('User not found');
+  const existing = await findUserById(req.params.id);
+  if (!existing) throw ApiError.notFound('User not found');
 
-  user.accountStatus = status;
-  user.statusReason = status === ACCOUNT_STATUS.ACTIVE ? '' : reason;
-  user.statusChangedAt = new Date();
-  if (status !== ACCOUNT_STATUS.ACTIVE && user.role === ROLES.CREATOR) {
-    user.creatorProfile.isOnline = false;
-  }
-  await user.save();
+  const isActive = status === ACCOUNT_STATUS.ACTIVE;
+  const user = await db.transaction(async (tx) => {
+    const updated = await updateUser(
+      existing,
+      { accountStatus: status, statusReason: isActive ? '' : reason, statusChangedAt: new Date() },
+      tx
+    );
+    return !isActive && updated.role === ROLES.CREATOR ? updateCreatorProfile(updated, { isOnline: false }, tx) : updated;
+  });
 
   let cancelledRequests = 0;
-  if (status !== ACCOUNT_STATUS.ACTIVE) {
+  if (!isActive) {
     // Open requests from a restricted customer must not reach partners anymore
     if (user.role === ROLES.CLIENT) {
-      const open = await Booking.find({ client: user._id, status: BOOKING_STATUS.SEARCHING });
-      await Promise.all(
-        open.map(async (b) => {
-          Object.assign(b, { status: BOOKING_STATUS.CANCELLED, cancelledAt: new Date(), cancelledBy: 'superadmin' });
-          await b.save();
-          notifyBookingChange(b, BOOKING_EVENTS.CANCELLED);
-        })
-      );
-      cancelledRequests = open.length;
+      const cancelled = await db
+        .update(bookings)
+        .set({ status: BOOKING_STATUS.CANCELLED, cancelledAt: new Date(), cancelledBy: 'superadmin' })
+        .where(and(eq(bookings.clientId, user.id), eq(bookings.status, BOOKING_STATUS.SEARCHING)))
+        .returning();
+      cancelled.forEach((b) => notifyBookingChange(b, BOOKING_EVENTS.CANCELLED));
+      cancelledRequests = cancelled.length;
     }
-    forceLogout(user._id.toString(), accountNotice(user));
+    forceLogout(user.id, accountNotice(user));
   }
 
-  notifyAdmins(ADMIN_EVENTS.USER_STATUS, { userId: user._id.toString(), status });
+  notifyAdmins(ADMIN_EVENTS.USER_STATUS, { userId: user.id, status });
   res.json({
     success: true,
-    user: { id: user._id.toString(), name: user.name, role: user.role, ...accountFields(user) },
+    user: { id: user.id, name: user.name, role: user.role, ...accountFields(user) },
     cancelledRequests,
   });
 });

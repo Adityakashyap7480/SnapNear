@@ -24,7 +24,7 @@ export const signupSchema = z
     password,
     city: z.string().trim().max(80).optional().default(''),
     services: z.array(z.enum(['photo', 'video'])).optional(),
-    experienceYears: z.coerce.number().min(0).max(50).optional(),
+    experienceYears: z.coerce.number().int().min(0).max(50).optional(),
     gear: z.string().trim().max(200).optional(),
     bio: z.string().trim().max(300).optional(),
   })
@@ -60,7 +60,7 @@ export const dutyStatusSchema = z.object({
 
 export const updateCreatorProfileSchema = z.object({
   services: z.array(z.enum(['photo', 'video'])).min(1).optional(),
-  experienceYears: z.coerce.number().min(0).max(50).optional(),
+  experienceYears: z.coerce.number().int().min(0).max(50).optional(),
   gear: z.string().trim().max(200).optional(),
   bio: z.string().trim().max(300).optional(),
   upiId: z
@@ -85,7 +85,7 @@ export const verifyPaymentSchema = z.object({
 });
 
 export const markPayoutSchema = z.object({
-  creatorId: z.string().regex(/^[a-f0-9]{24}$/, 'Invalid partner'),
+  creatorId: z.string().trim().min(1, 'Invalid partner').max(64, 'Invalid partner'),
   reference: z.string().trim().max(80, 'Keep the reference under 80 characters').optional().default(''),
   note: z.string().trim().max(200, 'Keep the note under 200 characters').optional().default(''),
 });

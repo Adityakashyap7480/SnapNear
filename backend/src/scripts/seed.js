@@ -1,7 +1,7 @@
-/* Resets the database to one customer and one partner. WARNING: wipes existing users & bookings. */
-import { connectDB, disconnectDB } from '../config/db.js';
-import User from '../models/User.js';
-import Booking from '../models/Booking.js';
+/* Resets the database to one customer and one partner. WARNING: wipes existing users, bookings & payouts. */
+import { sql } from 'drizzle-orm';
+import { connectDB, db, disconnectDB } from '../db/index.js';
+import { createUser } from '../models/users.js';
 
 const CUSTOMER = {
   name: 'Aditya Kashyap',
@@ -32,11 +32,11 @@ const PARTNER = {
 async function run() {
   await connectDB();
 
-  await Promise.all([User.deleteMany({}), Booking.deleteMany({})]);
-  console.log('[seed] Cleared users and bookings');
+  await db.execute(sql`truncate table booking_declines, bookings, payouts, creator_profiles, users`);
+  console.log('[seed] Cleared users, bookings and payouts');
 
-  await User.create(CUSTOMER);
-  await User.create(PARTNER);
+  await createUser(CUSTOMER);
+  await createUser(PARTNER);
 
   console.log('[seed] Created 1 customer and 1 partner');
   console.log(`[seed] Customer: ${CUSTOMER.email} / ${CUSTOMER.password}`);

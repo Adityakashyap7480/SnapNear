@@ -1,19 +1,17 @@
 import { BOOKING_STATUS } from '../constants/roles.js';
 import { DURATION_MINUTES } from '../constants/pricing.js';
 
-const idOf = (ref) => (ref && ref._id ? ref._id.toString() : ref ? ref.toString() : null);
-
 /**
  * Shapes a booking for API responses.
+ * `b.creator` is the partner's live profile when attached with `withCreators`, else the saved snapshot is used.
  * `hideClientContact` masks the client's phone for creators who have not accepted the job yet.
  * `includeStartOtp` is only for the customer: the partner must hear the OTP from them.
  */
-export function serializeBooking(booking, { hideClientContact = false, includeStartOtp = false } = {}) {
-  const b = booking.toObject ? booking.toObject() : booking;
-  const creator = b.creator && b.creator._id ? b.creator : null;
+export function serializeBooking(b, { hideClientContact = false, includeStartOtp = false } = {}) {
+  const creator = b.creator || null;
 
   return {
-    id: b._id.toString(),
+    id: b.id,
     code: b.code,
     status: b.status,
     serviceType: b.serviceType,
@@ -30,18 +28,18 @@ export function serializeBooking(booking, { hideClientContact = false, includeSt
     creatorPayout: b.creatorPayout,
     platformFee: b.platformFee,
     client: {
-      id: idOf(b.client),
-      name: b.contactName || b.clientSnapshot?.name,
-      phone: hideClientContact ? null : b.contactPhone || b.clientSnapshot?.phone,
-      accountName: b.clientSnapshot?.name,
-      email: hideClientContact ? null : b.clientSnapshot?.email,
+      id: b.clientId,
+      name: b.contactName || b.clientName,
+      phone: hideClientContact ? null : b.contactPhone || b.clientPhone,
+      accountName: b.clientName,
+      email: hideClientContact ? null : b.clientEmail,
     },
-    creator: b.creator
+    creator: b.creatorId
       ? {
-          id: idOf(b.creator),
-          name: creator?.name || b.creatorSnapshot?.name,
-          phone: creator?.phone || b.creatorSnapshot?.phone,
-          email: creator?.email || b.creatorSnapshot?.email,
+          id: b.creatorId,
+          name: creator?.name || b.creatorName,
+          phone: creator?.phone || b.creatorPhone,
+          email: creator?.email || b.creatorEmail,
           experienceYears: creator?.creatorProfile?.experienceYears,
           gear: creator?.creatorProfile?.gear,
           rating: creator?.creatorProfile?.rating,
@@ -51,15 +49,15 @@ export function serializeBooking(booking, { hideClientContact = false, includeSt
     arrivedAt: b.arrivedAt,
     startedAt: b.startedAt,
     endsAt: b.endsAt || null,
-    startOtp: includeStartOtp && b.status === BOOKING_STATUS.ARRIVED ? b.startOtp?.code || null : undefined,
+    startOtp: includeStartOtp && b.status === BOOKING_STATUS.ARRIVED ? b.startOtpCode || null : undefined,
     completedAt: b.completedAt,
     cancelledAt: b.cancelledAt,
     cancelledBy: b.cancelledBy,
-    payment: b.payment?.status
-      ? { status: b.payment.status, method: b.payment.method || null, via: b.payment.via || null, paidAt: b.payment.paidAt || null }
+    payment: b.paymentStatus
+      ? { status: b.paymentStatus, method: b.paymentMethod || null, via: b.paymentVia || null, paidAt: b.paidAt || null }
       : null,
-    settlement: b.settlement?.status
-      ? { status: b.settlement.status, eligibleAt: b.settlement.eligibleAt || null, paidAt: b.settlement.paidAt || null }
+    settlement: b.settlementStatus
+      ? { status: b.settlementStatus, eligibleAt: b.settlementEligibleAt || null, paidAt: b.settledAt || null }
       : null,
     createdAt: b.createdAt,
     updatedAt: b.updatedAt,

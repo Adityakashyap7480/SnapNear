@@ -1,29 +1,25 @@
-import mongoose from 'mongoose';
-import Booking from '../models/Booking.js';
+import { and, eq } from 'drizzle-orm';
+import { bookings } from '../db/schema.js';
+import { findBooking, findBookingById, withCreator } from '../models/bookings.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { serializeBooking } from '../utils/serializers.js';
 import { createCheckout, finalizePayment, getCollectLink, syncPayment, verifyCheckout } from '../services/payments.js';
 import { isWebhookSignatureValid, toPaise } from '../services/razorpay.js';
 
-const CREATOR_FIELDS = 'name phone email creatorProfile';
-
 async function findClientBooking(req) {
-  const booking = await Booking.findOne({ _id: req.params.id, client: req.user.doc._id });
+  const booking = await findBooking(and(eq(bookings.id, req.params.id), eq(bookings.clientId, req.user.doc.id)));
   if (!booking) throw ApiError.notFound('Booking not found');
   return booking;
 }
 
 async function findCreatorBooking(req) {
-  const booking = await Booking.findOne({ _id: req.params.id, creator: req.user.doc._id });
+  const booking = await findBooking(and(eq(bookings.id, req.params.id), eq(bookings.creatorId, req.user.doc.id)));
   if (!booking) throw ApiError.notFound('Job not found');
   return booking;
 }
 
-const paymentResponse = async (booking) => {
-  await booking.populate('creator', CREATOR_FIELDS);
-  return { success: true, booking: serializeBooking(booking) };
-};
+const paymentResponse = async (booking) => ({ success: true, booking: serializeBooking(await withCreator(booking)) });
 
 // ----- Customer -----
 
@@ -79,11 +75,11 @@ export const razorpayWebhook = asyncHandler(async (req, res) => {
     payment.notes?.bookingId;
 
   const booking =
-    (mongoose.isValidObjectId(bookingId) && (await Booking.findById(bookingId))) ||
-    (payment.order_id && (await Booking.findOne({ 'payment.orderId': payment.order_id })));
+    (typeof bookingId === 'string' && (await findBookingById(bookingId))) ||
+    (payment.order_id && (await findBooking(eq(bookings.paymentOrderId, payment.order_id))));
 
-  if (booking && booking.payment?.status && payment.amount >= toPaise(booking.total)) {
-    const via = payment.order_id && payment.order_id === booking.payment.orderId ? 'app' : 'qr';
+  if (booking && booking.paymentStatus && payment.amount >= toPaise(booking.total)) {
+    const via = payment.order_id && payment.order_id === booking.paymentOrderId ? 'app' : 'qr';
     await finalizePayment(booking, payment, via);
   }
   res.json({ success: true });

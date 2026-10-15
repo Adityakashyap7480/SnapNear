@@ -1,6 +1,6 @@
 import './env.js';
 
-// Super Admin is not stored in MongoDB. These hardcoded credentials can be
+// Super Admin is not stored in the database. These hardcoded credentials can be
 // overridden through SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD in .env.
 const superAdmin = {
   id: 'super-admin',

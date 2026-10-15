@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import User from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { signToken } from '../utils/token.js';
@@ -8,6 +7,7 @@ import { ROLES } from '../constants/roles.js';
 import { ADMIN_EVENTS } from '../constants/events.js';
 import { notifyAdmins } from '../socket/index.js';
 import { assertAccountActive } from '../utils/accountStatus.js';
+import { comparePassword, createUser, emailExists, findUserByEmail, toPublicUser, updateUser } from '../models/users.js';
 
 const safeEqual = (a, b) => {
   const bufA = Buffer.from(String(a));
@@ -15,15 +15,19 @@ const safeEqual = (a, b) => {
   return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
 };
 
+const sessionFor = (user) => ({
+  success: true,
+  token: signToken({ id: user.id, role: user.role }),
+  user: toPublicUser(user),
+});
+
 export const signup = asyncHandler(async (req, res) => {
   const { role, name, email, phone, password, city, services, experienceYears, gear, bio } = req.body;
 
   if (email === superAdmin.email) throw ApiError.conflict('This email is reserved');
+  if (await emailExists(email)) throw ApiError.conflict('An account with this email already exists');
 
-  const existing = await User.exists({ email });
-  if (existing) throw ApiError.conflict('An account with this email already exists');
-
-  const user = await User.create({
+  const user = await createUser({
     role,
     name,
     email,
@@ -33,16 +37,12 @@ export const signup = asyncHandler(async (req, res) => {
     creatorProfile:
       role === ROLES.CREATOR
         ? { services, experienceYears: experienceYears ?? 1, gear: gear || '', bio: bio || '', isOnline: false }
-        : undefined,
+        : null,
   });
 
   notifyAdmins(ADMIN_EVENTS.USER_NEW, { role: user.role, name: user.name });
 
-  res.status(201).json({
-    success: true,
-    token: signToken({ id: user._id.toString(), role: user.role }),
-    user: user.toPublicJSON(),
-  });
+  res.status(201).json(sessionFor(user));
 });
 
 export const login = asyncHandler(async (req, res) => {
@@ -54,20 +54,13 @@ export const login = asyncHandler(async (req, res) => {
     return res.json({ success: true, token: signToken(user), user });
   }
 
-  const user = await User.findOne({ email }).select('+password');
-  if (!user || !(await user.comparePassword(password))) {
+  const user = await findUserByEmail(email, { withPassword: true });
+  if (!user || !(await comparePassword(user, password))) {
     throw ApiError.unauthorized('Invalid email or password');
   }
   assertAccountActive(user);
 
-  user.lastLoginAt = new Date();
-  await user.save();
-
-  return res.json({
-    success: true,
-    token: signToken({ id: user._id.toString(), role: user.role }),
-    user: user.toPublicJSON(),
-  });
+  return res.json(sessionFor(await updateUser(user, { lastLoginAt: new Date() })));
 });
 
 export const me = asyncHandler(async (req, res) => {

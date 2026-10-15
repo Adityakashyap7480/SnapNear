@@ -1,7 +1,7 @@
 import http from 'http';
 import env from './config/env.js';
 import app from './app.js';
-import { connectDB } from './config/db.js';
+import { connectDB } from './db/index.js';
 import { initSocket } from './socket/index.js';
 
 async function start() {

@@ -2,10 +2,25 @@ import dotenv from 'dotenv';
 
 dotenv.config({ quiet: true });
 
+// DATABASE_URL wins; otherwise the URL is built from the separate DB_* values
+function databaseUrlFromParts() {
+  const {
+    DB_HOST = '127.0.0.1',
+    DB_PORT = '5432',
+    DB_NAME = 'snapnear',
+    DB_USER = 'postgres',
+    DB_PASSWORD = 'postgres',
+    DB_SSL = 'false',
+  } = process.env;
+  const credentials = `${encodeURIComponent(DB_USER.trim())}:${encodeURIComponent(DB_PASSWORD.trim())}`;
+  const ssl = DB_SSL.trim() === 'true' ? '?sslmode=verify-full' : '';
+  return `postgres://${credentials}@${DB_HOST.trim()}:${DB_PORT.trim()}/${encodeURIComponent(DB_NAME.trim())}${ssl}`;
+}
+
 const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT) || 5000,
-  databaseUrl: process.env.DATABASE_URL || 'postgres://postgres:postgres@127.0.0.1:5432/snapnear',
+  databaseUrl: process.env.DATABASE_URL?.trim() || databaseUrlFromParts(),
   jwtSecret: process.env.JWT_SECRET || 'snapnear-dev-secret-change-me',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientOrigins: (process.env.CLIENT_ORIGIN || 'http://localhost:5173')

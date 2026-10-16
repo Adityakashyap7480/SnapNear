@@ -5,6 +5,7 @@ import { PageLoader } from '../ui/Spinner';
 import { useAuth } from '../../context/AuthContext';
 import { type Role } from '../../config/constants';
 import { ROUTES } from '../../config/routes';
+import { isAuthCallbackUrl } from '../../lib/completeAuthSession';
 import { homeFor } from '../../lib/roleHome';
 
 function Loading() {
@@ -27,6 +28,8 @@ export function RequireRole({ roles, children }: { roles: Role[]; children: Reac
 /** Login and signup: signed-in users are sent to their home. */
 export function GuestOnly({ children }: { children: ReactNode }) {
   const { user, initializing } = useAuth();
+  // OAuth popup: never redirect away — let maybeCompleteAuthSession close the window.
+  if (isAuthCallbackUrl()) return <Loading />;
   if (initializing) return <Loading />;
   if (user) return <Redirect href={homeFor(user.role)} />;
   return children;
@@ -34,6 +37,7 @@ export function GuestOnly({ children }: { children: ReactNode }) {
 
 export function HomeRedirect() {
   const { user, initializing } = useAuth();
+  if (isAuthCallbackUrl()) return <Loading />;
   if (initializing) return <Loading />;
   return <Redirect href={user ? homeFor(user.role) : ROUTES.LOGIN} />;
 }

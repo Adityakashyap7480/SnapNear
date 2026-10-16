@@ -1,9 +1,10 @@
 import { Platform } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
+import { completeAuthSessionIfNeeded } from './completeAuthSession';
 
-WebBrowser.maybeCompleteAuthSession();
+// Also completed from root _layout — keep here for screens that import this module first.
+completeAuthSessionIfNeeded();
 
 /** Pull a single Google OAuth client ID out of a possibly corrupted env value. */
 function parseClientId(raw: string | undefined): string {

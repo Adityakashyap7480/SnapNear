@@ -102,6 +102,45 @@ export default function SignupScreen() {
   const [request, response, promptAsync] = useGoogleIdTokenRequest();
   // Form snapshot waiting for Google to finish (Join click → Google → create)
   const pendingRef = useRef<Form | null>(null);
+  const PENDING_KEY = 'snapnear_pending_signup';
+
+  const savePending = (data: Form) => {
+    pendingRef.current = data;
+    try {
+      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(PENDING_KEY, JSON.stringify(data));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const takePending = (): Form | null => {
+    const fromRef = pendingRef.current;
+    pendingRef.current = null;
+    if (fromRef) {
+      try {
+        sessionStorage?.removeItem(PENDING_KEY);
+      } catch {
+        /* ignore */
+      }
+      return fromRef;
+    }
+    try {
+      const raw = sessionStorage?.getItem(PENDING_KEY);
+      sessionStorage?.removeItem(PENDING_KEY);
+      return raw ? (JSON.parse(raw) as Form) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const clearPending = () => {
+    pendingRef.current = null;
+    try {
+      sessionStorage?.removeItem(PENDING_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const [form, setForm] = useState<Form>({
     role: ['partner', 'creator'].includes(String(params.role)) ? 'creator' : 'client',
@@ -179,7 +218,7 @@ export default function SignupScreen() {
     if (!response) return;
     if (response.type !== 'success') {
       setSubmitting(false);
-      pendingRef.current = null;
+      clearPending();
       if (response.type === 'error') {
         setFormError('Google sign-in failed. Please try again.');
       }
@@ -187,8 +226,7 @@ export default function SignupScreen() {
     }
 
     const idToken = response.params.id_token;
-    const data = pendingRef.current;
-    pendingRef.current = null;
+    const data = takePending();
     if (!idToken || !data) {
       setSubmitting(false);
       setFormError('Google did not return a verified email. Try again.');
@@ -223,14 +261,14 @@ export default function SignupScreen() {
       return;
     }
 
-    pendingRef.current = { ...form, email: form.email.trim().toLowerCase() };
+    savePending({ ...form, email: form.email.trim().toLowerCase() });
     setFormError('');
     setSubmitting(true);
     try {
       const result = await promptAsync({ showInRecents: true });
       if (result.type !== 'success') {
         setSubmitting(false);
-        pendingRef.current = null;
+        clearPending();
         if (result.type === 'dismiss' || result.type === 'cancel') {
           toast('Google verification cancelled');
         }
@@ -238,7 +276,7 @@ export default function SignupScreen() {
       // success is handled in the useEffect via `response`
     } catch {
       setSubmitting(false);
-      pendingRef.current = null;
+      clearPending();
       setFormError('Could not open Google sign-in');
     }
   };

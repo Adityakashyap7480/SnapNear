@@ -43,8 +43,9 @@ export function ScrollPage({ children, contentClassName, header }: ScrollPagePro
       {header}
       <ScrollView
         ref={scrollRef}
-        className="flex-1"
-        contentContainerClassName="flex-grow"
+        className="w-full flex-1"
+        style={{ width: '100%' }}
+        contentContainerStyle={{ flexGrow: 1, width: '100%' }}
         keyboardShouldPersistTaps="always"
         keyboardDismissMode="on-drag"
         nestedScrollEnabled
@@ -53,7 +54,7 @@ export function ScrollPage({ children, contentClassName, header }: ScrollPagePro
           viewportHeight.current = e.nativeEvent.layout.height;
         }}
       >
-        <View ref={contentRef} collapsable={false} className={`flex-grow ${contentClassName || ''}`}>
+        <View ref={contentRef} collapsable={false} className={`w-full flex-grow ${contentClassName || ''}`} style={{ width: '100%' }}>
           {children}
         </View>
       </ScrollView>

@@ -28,6 +28,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     bundleIdentifier: env.IOS_BUNDLE_ID || 'in.snapnear.app',
     supportsTablet: true,
+    infoPlist: {
+      NSLocationWhenInUseUsageDescription:
+        'SnapNear uses your location to match customers and photographers within 10 km.',
+    },
   },
   android: {
     package: env.ANDROID_PACKAGE || 'in.snapnear.app',
@@ -38,7 +42,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/android-icon-foreground.png',
       monochromeImage: './assets/android-icon-monochrome.png',
     },
-    permissions: ['VIBRATE', 'RECEIVE_BOOT_COMPLETED', 'POST_NOTIFICATIONS'],
+    permissions: [
+      'VIBRATE',
+      'RECEIVE_BOOT_COMPLETED',
+      'POST_NOTIFICATIONS',
+      'ACCESS_COARSE_LOCATION',
+      'ACCESS_FINE_LOCATION',
+    ],
     predictiveBackGestureEnabled: false,
   },
   web: {
@@ -60,6 +70,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         icon: './assets/android-icon-foreground.png',
         color: '#ff8008',
         defaultChannel: 'shoots',
+      },
+    ],
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission:
+          'Allow SnapNear to use your location to match shoots within 10 km.',
       },
     ],
     ['expo-audio', { microphonePermission: false, recordAudioAndroid: false }],

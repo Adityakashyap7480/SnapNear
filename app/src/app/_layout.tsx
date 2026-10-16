@@ -30,11 +30,16 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
-      <View className="flex-1 bg-slate-50">
+      <View className="w-full flex-1 bg-slate-50" style={{ width: '100%', flex: 1 }}>
         <CatalogProvider>
           <AuthProvider>
             <SocketProvider>
-              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#f8fafc' } }} />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: '#f8fafc', width: '100%', flex: 1 },
+                }}
+              />
               <CheckoutHost />
             </SocketProvider>
           </AuthProvider>

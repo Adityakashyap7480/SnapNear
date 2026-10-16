@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   date,
+  doublePrecision,
   index,
   integer,
   numeric,
@@ -60,6 +61,11 @@ export const users = pgTable(
     passwordHash: text('password_hash').notNull(),
     role: userRole('role').notNull(),
     city: text('city').notNull().default(''),
+    /** Reverse-geocoded label from the device GPS (partners; clients use booking.address). */
+    address: text('address').notNull().default(''),
+    latitude: doublePrecision('latitude'),
+    longitude: doublePrecision('longitude'),
+    locationUpdatedAt: ts('location_updated_at'),
     accountStatus: accountStatus('account_status').notNull().default(ACCOUNT_STATUS.ACTIVE),
     statusReason: text('status_reason').notNull().default(''),
     statusChangedAt: ts('status_changed_at'),
@@ -140,6 +146,8 @@ export const bookings = pgTable(
     shootDate: date('shoot_date', { mode: 'string' }).notNull(),
     timeSlot: text('time_slot').notNull(),
     address: text('address').notNull(),
+    latitude: doublePrecision('latitude'),
+    longitude: doublePrecision('longitude'),
     contactName: text('contact_name').notNull(),
     contactPhone: text('contact_phone').notNull(),
     notes: text('notes').notNull().default(''),

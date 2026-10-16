@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ApiError } from '../common/api-error.js';
 import { assertAccountActive } from '../common/account-status.js';
-import type { GoogleAuthInput, LoginInput, SignupInput } from '../common/validation.js';
+import type { GoogleAuthInput, LoginInput, SignupInput, UpdateMeInput } from '../common/validation.js';
 import { ADMIN_EVENTS } from '../constants/events.js';
 import { ROLES } from '../constants/roles.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
@@ -117,5 +117,16 @@ export class AuthService {
 
     this.realtime.notifyAdmins(ADMIN_EVENTS.USER_NEW, { role: user.role, name: user.name });
     return sessionFor(user);
+  }
+
+  async updateMe(user: User, input: UpdateMeInput) {
+    const changes = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
+    if (!Object.keys(changes).length) return { success: true, user: toPublicUser(user) };
+    const withLocation =
+      changes.latitude !== undefined && changes.longitude !== undefined && changes.address !== undefined
+        ? { ...changes, locationUpdatedAt: new Date() }
+        : changes;
+    const updated = await this.users.update(user, withLocation);
+    return { success: true, user: toPublicUser(updated) };
   }
 }

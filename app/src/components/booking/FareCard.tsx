@@ -86,7 +86,7 @@ export default function FareCard({ tier, serviceLabel, onBroadcast, submitting }
           </Gradient>
         </Pressable>
         <Text className="mt-2.5 text-center text-[11px] text-slate-400">
-          Verified photographers within 5 km get an instant ping. The first to accept comes to you.
+          Verified photographers within 10 km get an instant ping. The first to accept comes to you.
         </Text>
       </View>
     </View>

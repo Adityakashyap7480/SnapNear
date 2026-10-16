@@ -1,7 +1,8 @@
-import { type ReactNode, useState } from 'react';
-import { Modal, Pressable, View, useWindowDimensions } from 'react-native';
+import type { ReactNode } from 'react';
+import { Pressable, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Briefcase, CalendarPlus, ChevronDown, LogOut, ShieldCheck, Wifi, WifiOff, type LucideIcon } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Briefcase, CalendarPlus, Wifi, WifiOff, type LucideIcon } from 'lucide-react-native';
 import Logo from '../ui/Logo';
 import Avatar from '../ui/Avatar';
 import Text from '../ui/Text';
@@ -10,6 +11,7 @@ import { useCatalog } from '../../context/CatalogContext';
 import { ScrollPage } from '../../context/ScrollContext';
 import { useSocket } from '../../context/SocketContext';
 import { APP_NAMES, ROLES, ROLE_LABELS } from '../../config/constants';
+import { ROUTES } from '../../config/routes';
 import { colors } from '../../theme/colors';
 import { shadows } from '../../theme/shadows';
 import { formatINR } from '../../utils/format';
@@ -24,80 +26,17 @@ const TAGLINE: Record<string, string> = {
   [ROLES.CREATOR]: 'Partner app for photographers',
 };
 
-function UserMenu({ top }: { top: number }) {
-  const { user, logout } = useAuth();
-  const { width } = useWindowDimensions();
-  const [open, setOpen] = useState(false);
-  if (!user) return null;
-
-  return (
-    <>
-      <Pressable
-        testID="user-menu"
-        accessibilityRole="button"
-        accessibilityLabel="Account menu"
-        onPress={() => setOpen((o) => !o)}
-        className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white py-1 pl-1 pr-2"
-      >
-        <Avatar name={user.name} size="sm" />
-        {width >= 1024 && (
-          <View>
-            <Text className="max-w-[120px] truncate text-xs font-bold text-slate-900">{user.name}</Text>
-            <Text className="text-[10px] font-medium text-slate-500">{ROLE_LABELS[user.role]}</Text>
-          </View>
-        )}
-        <ChevronDown size={14} color={colors.slate[400]} />
-      </Pressable>
-
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable className="flex-1" onPress={() => setOpen(false)}>
-          <View
-            className="absolute w-60 rounded-2xl border border-slate-200 bg-white p-2"
-            style={[shadows.xl, { top, right: Math.max(12, (width - 1280) / 2 + 16) }]}
-          >
-            <View className="border-b border-slate-100 px-3 py-2.5">
-              <Text className="text-sm font-bold text-slate-900">{user.name}</Text>
-              <Text className="truncate text-xs text-slate-500">{user.email}</Text>
-              <View className="mt-1.5 flex-row items-center gap-1 self-start rounded-md bg-slate-100 px-2 py-0.5">
-                <ShieldCheck size={12} color={colors.slate[700]} />
-                <Text className="text-[10px] font-bold text-slate-700">{ROLE_LABELS[user.role]}</Text>
-              </View>
-            </View>
-            <Pressable
-              testID="logout"
-              accessibilityRole="button"
-              onPress={() => {
-                setOpen(false);
-                logout();
-              }}
-              className="mt-1 flex-row items-center gap-2 rounded-xl px-3 py-2 active:bg-red-50"
-            >
-              <LogOut size={16} color={colors.red[600]} />
-              <Text className="text-sm font-semibold text-red-600">Log out</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
-    </>
-  );
-}
-
 export default function PortalLayout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { connected } = useSocket();
   const { partnerPct, platformPct, startingPrice } = useCatalog();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const [headerHeight, setHeaderHeight] = useState(64);
   if (!user) return null;
   const nav = NAV_BY_ROLE[user.role];
 
   const header = (
-    <View
-      className="z-40 border-b border-slate-200 bg-white"
-      style={{ paddingTop: insets.top }}
-      onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
-    >
+    <View className="z-40 border-b border-slate-200 bg-white" style={{ paddingTop: insets.top }}>
       <View className="mx-auto w-full max-w-7xl flex-row items-center justify-between gap-3 px-3 py-3 sm:px-4">
         <View className="min-w-0 shrink">
           <Logo tagline={TAGLINE[user.role]} badge="Live" />
@@ -119,16 +58,32 @@ export default function PortalLayout({ children }: { children: ReactNode }) {
               <Text className={`text-[10px] font-bold ${connected ? 'text-emerald-700' : 'text-slate-500'}`}>{connected ? 'Live' : 'Offline'}</Text>
             </View>
           )}
-          <UserMenu top={headerHeight + 8} />
+          <Pressable
+            testID="user-menu"
+            accessibilityRole="button"
+            accessibilityLabel="Open profile"
+            onPress={() => router.push(ROUTES.PROFILE)}
+            className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white py-1 pl-1 pr-2 active:bg-slate-50"
+          >
+            <Avatar name={user.name} size="sm" />
+            {width >= 1024 && (
+              <View>
+                <Text className="max-w-[120px] truncate text-xs font-bold text-slate-900">{user.name}</Text>
+                <Text className="text-[10px] font-medium text-slate-500">{ROLE_LABELS[user.role]}</Text>
+              </View>
+            )}
+          </Pressable>
         </View>
       </View>
     </View>
   );
 
   return (
-    <View className="flex-1 bg-slate-50">
+    <View className="w-full flex-1 bg-slate-50" style={{ width: '100%' }}>
       <ScrollPage header={header}>
-        <View className="mx-auto w-full max-w-7xl flex-grow px-3 py-5 sm:px-4 sm:py-6">{children}</View>
+        <View className="mx-auto w-full max-w-7xl flex-grow px-3 py-5 sm:px-4 sm:py-6" style={{ width: '100%', alignSelf: 'stretch' }}>
+          {children}
+        </View>
 
         <View className="border-t border-slate-200 bg-white py-5" style={{ paddingBottom: 20 + insets.bottom }}>
           <View className={`mx-auto w-full max-w-7xl items-center justify-between gap-2 px-4 ${width >= 640 ? 'flex-row' : ''}`}>

@@ -9,6 +9,14 @@ export const authApi = {
   /** Verified Google ID token → login existing user or create with profile fields. */
   google: (data: Record<string, unknown>) => request<Session>('POST', '/auth/google', { data }),
   me: () => request<{ user: User }>('GET', '/auth/me'),
+  updateMe: (data: {
+    name?: string;
+    phone?: string;
+    city?: string;
+    address?: string;
+    latitude?: number;
+    longitude?: number;
+  }) => request<{ user: User }>('PATCH', '/auth/me', { data }),
   registerPushToken: (data: { token: string; platform: 'android' | 'ios' | 'web' | 'unknown' }) =>
     request<{ success: boolean }>('POST', '/auth/push-token', { data }),
   clearPushToken: (data: { token?: string } = {}) => request<{ success: boolean }>('POST', '/auth/push-token/clear', { data }),

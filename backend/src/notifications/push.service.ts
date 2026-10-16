@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { and, arrayContains, eq } from 'drizzle-orm';
+import { and, arrayContains, eq, isNotNull } from 'drizzle-orm';
+import { withinRadiusKm } from '../common/geo.js';
 import { env } from '../config/env.js';
 import { ROLES, type ServiceType } from '../constants/roles.js';
 import { DatabaseService } from '../database/database.service.js';
@@ -47,10 +48,17 @@ export class PushService {
     await this.db.delete(deviceTokens).where(eq(deviceTokens.userId, userId));
   }
 
-  /** Online partners who offer this service type (same pool as the live feed). */
-  async tokensForOnlineCreators(serviceType: ServiceType): Promise<string[]> {
+  /** Online partners who offer this service and are within MATCH_RADIUS_KM of the shoot. */
+  async tokensForOnlineCreators(
+    serviceType: ServiceType,
+    shoot?: { latitude?: number | null; longitude?: number | null }
+  ): Promise<string[]> {
     const rows = await this.db
-      .select({ token: deviceTokens.token })
+      .select({
+        token: deviceTokens.token,
+        latitude: users.latitude,
+        longitude: users.longitude,
+      })
       .from(deviceTokens)
       .innerJoin(users, eq(users.id, deviceTokens.userId))
       .innerJoin(creatorProfiles, eq(creatorProfiles.userId, users.id))
@@ -58,10 +66,21 @@ export class PushService {
         and(
           eq(users.role, ROLES.CREATOR),
           eq(creatorProfiles.isOnline, true),
-          arrayContains(creatorProfiles.services, [serviceType])
+          arrayContains(creatorProfiles.services, [serviceType]),
+          isNotNull(users.latitude),
+          isNotNull(users.longitude)
         )
       );
-    return [...new Set(rows.map((r) => r.token).filter(Boolean))];
+    const nearby = shoot
+      ? rows.filter((r) =>
+          withinRadiusKm(
+            { latitude: r.latitude, longitude: r.longitude },
+            { latitude: shoot.latitude, longitude: shoot.longitude },
+            env.matchRadiusKm
+          )
+        )
+      : rows;
+    return [...new Set(nearby.map((r) => r.token).filter(Boolean))];
   }
 
   async tokensForUser(userId: string): Promise<string[]> {
@@ -70,7 +89,7 @@ export class PushService {
   }
 
   async notifyNewShoot(booking: Booking) {
-    const tokens = await this.tokensForOnlineCreators(booking.serviceType);
+    const tokens = await this.tokensForOnlineCreators(booking.serviceType, booking);
     if (!tokens.length) return;
     await this.send(
       tokens.map((to) => ({

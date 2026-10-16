@@ -22,7 +22,15 @@ import { PushService } from '../notifications/push.service.js';
 import { PaymentsService, isPaymentDue } from '../payments/payments.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { BookingsRepository } from '../repositories/bookings.repository.js';
-import { type User, UsersRepository, needsPartnerTerms, toPublicUser } from '../repositories/users.repository.js';
+import { withinRadiusKm } from '../common/geo.js';
+import {
+  type User,
+  UsersRepository,
+  hasPartnerLocation,
+  needsPartnerLocation,
+  needsPartnerTerms,
+  toPublicUser,
+} from '../repositories/users.repository.js';
 
 const TIMESTAMP_FOR_STATUS: Partial<Record<BookingStatus, 'arrivedAt' | 'startedAt' | 'completedAt'>> = {
   [BOOKING_STATUS.ARRIVED]: 'arrivedAt',
@@ -127,6 +135,26 @@ export class CreatorService {
     );
   }
 
+  /** Service/decline filter first, then keep only shoots within MATCH_RADIUS_KM of the partner. */
+  private async nearbyOpenRequests(creator: User, limit = 20) {
+    if (!hasPartnerLocation(creator)) return [];
+    const rows = await this.db
+      .select()
+      .from(bookings)
+      .where(this.openRequests(creator))
+      .orderBy(desc(bookings.createdAt))
+      .limit(100);
+    return rows
+      .filter((b) =>
+        withinRadiusKm(
+          { latitude: creator.latitude, longitude: creator.longitude },
+          { latitude: b.latitude, longitude: b.longitude },
+          env.matchRadiusKm
+        )
+      )
+      .slice(0, limit);
+  }
+
   async dashboard(current: AppUser) {
     const creator = current.doc;
     const isOnline = Boolean(creator.creatorProfile?.isOnline);
@@ -143,9 +171,7 @@ export class CreatorService {
     );
 
     const [requests, [activeJob], history, stats, wallet] = await Promise.all([
-      isOnline
-        ? this.db.select().from(bookings).where(this.openRequests(creator)).orderBy(desc(bookings.createdAt)).limit(20)
-        : Promise.resolve([]),
+      isOnline ? this.nearbyOpenRequests(creator, 20) : Promise.resolve([]),
       this.db
         .select()
         .from(bookings)
@@ -187,6 +213,9 @@ export class CreatorService {
 
   async setDutyStatus(current: AppUser, isOnline: boolean) {
     if (isOnline && needsPartnerTerms(current.doc)) throw ApiError.forbidden(TERMS_REQUIRED_MESSAGE);
+    if (isOnline && needsPartnerLocation(current.doc)) {
+      throw ApiError.forbidden('Share your current location before going online');
+    }
     const creator = await this.users.updateCreatorProfile(current.doc, { isOnline });
 
     this.realtime.notifyAdmins(ADMIN_EVENTS.CREATOR_DUTY, { creatorId: creator.id, isOnline });
@@ -203,6 +232,10 @@ export class CreatorService {
     const creator = current.doc;
 
     if (needsPartnerTerms(creator)) throw ApiError.forbidden(TERMS_REQUIRED_MESSAGE);
+    if (needsPartnerLocation(creator)) throw ApiError.forbidden('Share your current location before accepting shoots');
+    if (!creator.creatorProfile?.upiId?.trim()) {
+      throw ApiError.forbidden('Add your UPI ID in My Wallet before you can accept shoots');
+    }
     if (!creator.creatorProfile?.isOnline) {
       throw ApiError.badRequest('Go online to accept shoot requests');
     }
@@ -212,6 +245,18 @@ export class CreatorService {
     );
     if (activeJob) {
       throw ApiError.conflict('Finish your current shoot before accepting a new one');
+    }
+
+    const candidate = await this.bookings.find(and(eq(bookings.id, id), this.openRequests(creator)));
+    if (!candidate) throw ApiError.notFound('This shoot is no longer available');
+    if (
+      !withinRadiusKm(
+        { latitude: creator.latitude, longitude: creator.longitude },
+        { latitude: candidate.latitude, longitude: candidate.longitude },
+        env.matchRadiusKm
+      )
+    ) {
+      throw ApiError.forbidden(`This shoot is outside your ${env.matchRadiusKm} km range`);
     }
 
     const booking = await this.bookings.update(and(eq(bookings.id, id), this.openRequests(creator)), {

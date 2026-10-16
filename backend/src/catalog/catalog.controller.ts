@@ -39,6 +39,7 @@ export class CatalogController {
         startOtpLength: env.startOtp.length,
         payoutHoldDays: env.payoutHoldDays,
         supportEmail: env.supportEmail,
+        matchRadiusKm: env.matchRadiusKm,
       },
     };
   }

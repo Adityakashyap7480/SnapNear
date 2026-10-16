@@ -63,8 +63,10 @@ export const OCCASIONS = [
   'Baby & Maternity',
   'Family Portrait',
   'Society / Clubhouse Event',
-  'Pre-Wedding / Couple',
   'Product / Business',
+  'Car Shoot',
+  'Pooja Shoot',
+  'Vlog Shoot',
 ] as const;
 
 export const TIME_SLOTS = [

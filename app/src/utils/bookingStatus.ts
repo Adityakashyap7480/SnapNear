@@ -82,8 +82,23 @@ export const OCCASION_EMOJI: Record<string, string> = {
   'Baby & Maternity': '👶',
   'Family Portrait': '👨‍👩‍👧',
   'Society / Clubhouse Event': '🏢',
-  'Pre-Wedding / Couple': '💑',
   'Product / Business': '🛍️',
+  'Car Shoot': '🚗',
+  'Pooja Shoot': '🙏',
+  'Vlog Shoot': '🎬',
+};
+
+/** Small thumbnails shown under each Shoot Occasion chip (web + Android). */
+export const OCCASION_IMAGES: Record<string, number> = {
+  'Birthday Celebration': require('../../assets/occasions/birthday.jpg'),
+  'Instagram / Fashion Shoot': require('../../assets/occasions/fashion.jpg'),
+  'Baby & Maternity': require('../../assets/occasions/maternity.jpg'),
+  'Family Portrait': require('../../assets/occasions/family.jpg'),
+  'Society / Clubhouse Event': require('../../assets/occasions/society.jpg'),
+  'Product / Business': require('../../assets/occasions/product.jpg'),
+  'Car Shoot': require('../../assets/occasions/car.jpg'),
+  'Pooja Shoot': require('../../assets/occasions/pooja.jpg'),
+  'Vlog Shoot': require('../../assets/occasions/vlog.jpg'),
 };
 
 export type ShootPhase = 'running' | 'warning' | 'overtime';

@@ -53,6 +53,31 @@ export const clearPushTokenSchema = z.object({
 });
 export type ClearPushTokenInput = z.output<typeof clearPushTokenSchema>;
 
+const latitude = z.coerce.number().min(-90).max(90);
+const longitude = z.coerce.number().min(-180).max(180);
+
+export const updateMeSchema = z
+  .object({
+    name: z.string().trim().min(2, 'Name must be at least 2 characters').max(80).optional(),
+    phone: phone.optional(),
+    city: z.string().trim().max(80).optional(),
+    /** GPS reverse-geocode label — partners use this as their current base. */
+    address: z.string().trim().min(8, 'Current location address is required').max(250).optional(),
+    latitude: latitude.optional(),
+    longitude: longitude.optional(),
+  })
+  .superRefine((d, ctx) => {
+    const hasLat = d.latitude !== undefined;
+    const hasLng = d.longitude !== undefined;
+    const hasAddr = d.address !== undefined;
+    if (hasLat || hasLng || hasAddr) {
+      if (!hasLat || !hasLng || !hasAddr) {
+        ctx.addIssue({ code: 'custom', message: 'Share a complete current location (address + GPS)', path: ['address'] });
+      }
+    }
+  });
+export type UpdateMeInput = z.output<typeof updateMeSchema>;
+
 /** Google ID token login, or first-time signup with the remaining profile fields. */
 export const googleAuthSchema = z
   .object({
@@ -82,7 +107,9 @@ export const createBookingSchema = z.object({
   occasion: z.enum(OCCASIONS, { message: 'Pick a shoot occasion' }),
   shootDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a valid shoot date'),
   timeSlot: z.enum(TIME_SLOTS, { message: 'Pick a time slot' }),
-  address: z.string().trim().min(8, 'Enter your full doorstep address').max(250),
+  address: z.string().trim().min(8, 'Share your current location so we can fill the address').max(250),
+  latitude,
+  longitude,
   contactName: z.string().trim().min(2, 'Enter contact name').max(80),
   contactPhone: phone,
   notes: z.string().trim().max(300).optional().default(''),

@@ -55,7 +55,7 @@ function FloatingPartnerCard() {
 export default function AuthLayout({ children }: { children: ReactNode }) {
   const { startingPrice } = useCatalog();
   const features = [
-    { icon: Zap, title: 'Instant doorstep dispatch', text: 'Verified photographers within 5 km get your request in seconds.' },
+    { icon: Zap, title: 'Instant doorstep dispatch', text: 'Verified photographers within 10 km get your request in seconds.' },
     { icon: ShieldCheck, title: 'Verified & experienced', text: 'Every SnapNear Partner is background-checked.' },
     {
       icon: IndianRupee,

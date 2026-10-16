@@ -68,11 +68,11 @@ export const env = {
     password: required('SUPER_ADMIN_PASSWORD', { trim: false }),
   },
 
-  clientOrigins: text('CLIENT_ORIGIN', 'http://localhost:5173')
+  clientOrigins: text('CLIENT_ORIGIN', 'http://localhost:8081,http://localhost:5173,http://localhost:5175')
     .split(',')
     .map((o) => o.trim().replace(/\/$/, ''))
     .filter(Boolean),
-  supportEmail: text('SUPPORT_EMAIL', 'support@snapnear.in'),
+  supportEmail: text('SUPPORT_EMAIL', 'supportsnear@gmail.com'),
 
   /** Google OAuth client IDs allowed to mint ID tokens (web / Android / iOS). Comma-separated. */
   googleClientIds: text('GOOGLE_CLIENT_IDS', '')
@@ -107,6 +107,8 @@ export const env = {
   },
   payoutHoldDays: number('PAYOUT_HOLD_DAYS', 7),
   maxActiveBookings: number('MAX_ACTIVE_BOOKINGS', 3, { min: 1 }),
+  /** Max distance (km) between customer shoot coords and partner current location. */
+  matchRadiusKm: number('MATCH_RADIUS_KM', 10, { min: 1, max: 50, integer: false }),
   startOtp: {
     length: number('START_OTP_LENGTH', 4, { min: 4, max: 8 }),
     maxAttempts: number('START_OTP_MAX_ATTEMPTS', 5, { min: 1 }),

@@ -78,6 +78,8 @@ export class BookingsService {
       shootDate: data.shootDate,
       timeSlot: data.timeSlot,
       address: data.address,
+      latitude: data.latitude,
+      longitude: data.longitude,
       contactName: data.contactName,
       contactPhone: data.contactPhone,
       notes: data.notes,

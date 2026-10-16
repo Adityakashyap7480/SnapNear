@@ -8,7 +8,18 @@ const isWeb = Platform.OS === 'web';
 export const API_ORIGIN = trimSlash(process.env.EXPO_PUBLIC_API_URL);
 export const API_BASE_URL = `${API_ORIGIN}/api`;
 export const API_TIMEOUT_MS = 15000;
-export const SOCKET_URL = API_ORIGIN || (isWeb ? window.location.origin : '');
+
+/**
+ * Socket.io needs a real backend host in local Expo web — Metro's HTTP proxy does not
+ * reliably upgrade ws://localhost:8081/socket.io to Nest.
+ */
+const localWebHost =
+  isWeb && typeof window !== 'undefined'
+    ? window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    : false;
+export const SOCKET_URL =
+  API_ORIGIN ||
+  (localWebHost ? trimSlash(process.env.EXPO_DEV_BACKEND || 'http://localhost:5000') : isWeb ? window.location.origin : '');
 
 /** Public website, used by the phone app to open the owner panel in the browser. */
 export const WEB_URL = trimSlash(process.env.EXPO_PUBLIC_WEB_URL) || (isWeb ? window.location.origin : '');
@@ -18,7 +29,10 @@ export const ADMIN_URL = trimSlash(process.env.EXPO_PUBLIC_ADMIN_URL) || `${WEB_
 // Shared with the admin app on the same domain, so one login works everywhere
 export const TOKEN_KEY = 'snapnear.token';
 
-export const SUPPORT_EMAIL = process.env.EXPO_PUBLIC_SUPPORT_EMAIL || 'support@snapnear.in';
+export const SUPPORT_EMAIL = process.env.EXPO_PUBLIC_SUPPORT_EMAIL || 'supportsnear@gmail.com';
+
+/** Partners only see (and get pushed) customer shoots within this radius. */
+export const MATCH_RADIUS_KM = Number(process.env.EXPO_PUBLIC_MATCH_RADIUS_KM) || 10;
 
 export const ROLES = {
   CLIENT: 'client',

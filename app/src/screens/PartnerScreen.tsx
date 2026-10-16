@@ -1,27 +1,28 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
-import { BadgeCheck, Camera, CheckCheck, History, IndianRupee, Landmark, Locate, Power, Radar, Star, Wallet } from 'lucide-react-native';
+import { Camera, CheckCheck, History, Locate, Power, Radar, Star, Wallet } from 'lucide-react-native';
+import { router } from 'expo-router';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
-import Card, { EmptyState, StatCard } from '../components/ui/Card';
-import Grid from '../components/ui/Grid';
+import Button from '../components/ui/Button';
+import Card, { EmptyState } from '../components/ui/Card';
 import { PageLoader } from '../components/ui/Spinner';
 import Text from '../components/ui/Text';
 import { Ripple } from '../components/ui/motion';
 import ActiveJobCard from '../components/partner/ActiveJobCard';
 import CollectPaymentCard from '../components/partner/CollectPaymentCard';
 import JobHistory from '../components/partner/JobHistory';
+import PartnerLocationModal from '../components/partner/PartnerLocationModal';
 import PartnerTermsModal from '../components/partner/PartnerTermsModal';
 import PaymentQrModal from '../components/partner/PaymentQrModal';
 import RequestCard from '../components/partner/RequestCard';
-import WalletCard from '../components/partner/WalletCard';
 import PaymentCelebration, { type Celebration } from '../components/payment/PaymentCelebration';
 import TimeUpAlert from '../components/shoot/TimeUpAlert';
 import { creatorApi } from '../api/services';
 import { BOOKING_STATUS } from '../config/constants';
 import { BOOKING_EVENTS, SOCKET_EVENTS } from '../config/events';
+import { ROUTES } from '../config/routes';
 import { useAuth } from '../context/AuthContext';
-import { useCatalog } from '../context/CatalogContext';
 import { useScroll } from '../context/ScrollContext';
 import { useSocketEvent } from '../context/SocketContext';
 import useAsync from '../hooks/useAsync';
@@ -38,7 +39,6 @@ import { serverNow } from '../utils/serverClock';
 
 export default function PartnerScreen() {
   const { user } = useAuth();
-  const { partnerPct, platformPct } = useCatalog();
   const { scrollToTop } = useScroll();
   const { width } = useWindowDimensions();
   const md = width >= 768;
@@ -112,6 +112,12 @@ export default function PartnerScreen() {
   const { profile, requests, activeJob, awaitingPayment, history, stats, wallet } = data;
   const cp = profile.creatorProfile;
   const online = cp.isOnline;
+  const hasUpi = Boolean(wallet.upiId?.trim());
+  const acceptBlockedReason = !hasUpi
+    ? 'Add your UPI ID in My Wallet first'
+    : activeJob
+      ? 'Finish your current shoot first'
+      : undefined;
 
   const toggleDuty = async () => {
     setTogglingDuty(true);
@@ -127,6 +133,11 @@ export default function PartnerScreen() {
   };
 
   const accept = async (req: Booking) => {
+    if (!hasUpi) {
+      toast.error('Add your UPI ID in My Wallet before accepting shoots');
+      router.push(ROUTES.PROFILE_WALLET);
+      return;
+    }
     // Ref lock so the first tap always wins (React busy state updates one frame later).
     if (busyLock.current) return;
     busyLock.current = req.id;
@@ -197,6 +208,7 @@ export default function PartnerScreen() {
   return (
     <View className="gap-6">
       {user?.needsPartnerTerms && <PartnerTermsModal />}
+      {!user?.needsPartnerTerms && user?.needsPartnerLocation && <PartnerLocationModal />}
       {celebration && <PaymentCelebration key={celebration.key} celebration={celebration} onClose={closeCelebration} />}
       {qrJob && <PaymentQrModal key={qrJob.id} job={qrJob} onClose={closeQr} onPaid={celebratePayment} />}
       {timeUpJob && (
@@ -276,18 +288,31 @@ export default function PartnerScreen() {
         </View>
       </Card>
 
-      <Grid cols={width >= 1024 ? 4 : 2}>
-        <StatCard
-          tone="emerald"
-          icon={Wallet}
-          label="Today's Net Earnings"
-          value={formatINR(stats.todayEarnings, { fixed: true })}
-          hint={`${stats.todayCompleted} shoot(s) today • your ${partnerPct}`}
-        />
-        <StatCard icon={BadgeCheck} label="Completed Shoots" value={stats.completed} hint="Lifetime on SnapNear" />
-        <StatCard tone="violet" icon={IndianRupee} label="Lifetime Earnings" value={formatINR(stats.lifetimeEarnings, { fixed: true })} hint={`Your ${partnerPct} payouts`} />
-        <StatCard icon={Landmark} label="Platform Commission" value={formatINR(stats.platformFeePaid, { fixed: true })} hint={`${platformPct} tech fee contribution`} />
-      </Grid>
+      {!hasUpi && (
+        <Card className="border-amber-200 bg-amber-50 p-4">
+          <View className="flex-row items-start gap-3">
+            <View className="mt-0.5 h-9 w-9 items-center justify-center rounded-xl bg-amber-100">
+              <Wallet size={18} color={colors.amber[600]} />
+            </View>
+            <View className="min-w-0 flex-1 gap-2">
+              <Text className="font-display text-sm font-bold text-slate-900">Add your UPI ID to accept shoots</Text>
+              <Text className="text-xs leading-5 text-slate-600">
+                Go to My Wallet and save your UPI ID for payouts first. You cannot accept a shoot until this is done.
+                You can update it anytime from Profile → My Wallet.
+              </Text>
+              <Button
+                size="sm"
+                variant="dark"
+                icon={Wallet}
+                className="self-start"
+                onPress={() => router.push(ROUTES.PROFILE_WALLET)}
+              >
+                Open My Wallet
+              </Button>
+            </View>
+          </View>
+        </Card>
+      )}
 
       {awaitingPayment.length > 0 && <CollectPaymentCard jobs={awaitingPayment} onShowQr={setQrJob} />}
 
@@ -339,14 +364,12 @@ export default function PartnerScreen() {
                 onAccept={accept}
                 onDecline={decline}
                 busy={busyId === r.id}
-                disabledReason={activeJob ? 'Finish your current shoot first' : undefined}
+                disabledReason={acceptBlockedReason}
               />
             ))}
           </View>
         )}
       </View>
-
-      <WalletCard wallet={wallet} onChanged={reload} />
 
       <Card className="p-4 sm:p-6">
         <View className="mb-3 flex-row items-center gap-2">

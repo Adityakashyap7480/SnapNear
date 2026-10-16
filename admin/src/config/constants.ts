@@ -11,7 +11,7 @@ export const APP_URL = trimSlash(import.meta.env.VITE_APP_URL);
 // Shared with the customer & partner app on the same domain, so one login works everywhere
 export const TOKEN_KEY = 'snapnear.token';
 
-export const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'support@snapnear.in';
+export const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'supportsnear@gmail.com';
 
 export const ROLES = {
   CLIENT: 'client',

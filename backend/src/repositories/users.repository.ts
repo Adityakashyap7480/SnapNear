@@ -134,6 +134,15 @@ const publicProfile = (p: CreatorProfile | null) =>
     termsAcceptedAt: p.termsAcceptedAt,
   };
 
+export const hasPartnerLocation = (user: User) =>
+  typeof user.latitude === 'number' &&
+  typeof user.longitude === 'number' &&
+  Number.isFinite(user.latitude) &&
+  Number.isFinite(user.longitude) &&
+  Boolean(user.address?.trim());
+
+export const needsPartnerLocation = (user: User) => user.role === ROLES.CREATOR && !hasPartnerLocation(user);
+
 export function toPublicUser(user: User) {
   return {
     id: user.id,
@@ -142,8 +151,13 @@ export function toPublicUser(user: User) {
     phone: user.phone,
     role: user.role,
     city: user.city,
+    address: user.address || '',
+    latitude: user.latitude ?? null,
+    longitude: user.longitude ?? null,
+    locationUpdatedAt: user.locationUpdatedAt || null,
     creatorProfile: user.role === ROLES.CREATOR ? publicProfile(user.creatorProfile) : undefined,
     needsPartnerTerms: needsPartnerTerms(user),
+    needsPartnerLocation: needsPartnerLocation(user),
     accountStatus: user.accountStatus || ACCOUNT_STATUS.ACTIVE,
     createdAt: user.createdAt,
   };

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Patch, Post } from '@nestjs/common';
 import { ZodPipe } from '../common/zod.pipe.js';
 import {
   type ClearPushTokenInput,
@@ -6,11 +6,13 @@ import {
   type LoginInput,
   type PushTokenInput,
   type SignupInput,
+  type UpdateMeInput,
   clearPushTokenSchema,
   googleAuthSchema,
   loginSchema,
   pushTokenSchema,
   signupSchema,
+  updateMeSchema,
 } from '../common/validation.js';
 import { PushService } from '../notifications/push.service.js';
 import { ROLES } from '../constants/roles.js';
@@ -48,6 +50,12 @@ export class AuthController {
   me(@CurrentUser() current: RequestUser) {
     const { doc: _doc, ...user } = current as RequestUser & { doc?: unknown };
     return { success: true, user };
+  }
+
+  @Patch('me')
+  @Auth(ROLES.CLIENT, ROLES.CREATOR)
+  updateMe(@CurrentUser() current: AppUser, @Body(new ZodPipe(updateMeSchema)) body: UpdateMeInput) {
+    return this.auth.updateMe(current.doc, body);
   }
 
   /** Register this device for background shoot alerts (Android/iOS badge + banner). */

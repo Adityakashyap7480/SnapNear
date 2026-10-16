@@ -1,4 +1,5 @@
 import { type ReactNode, createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import { type Socket, io } from 'socket.io-client';
 import { SOCKET_URL } from '../config/constants';
 import { APP_EVENTS, SOCKET_EVENTS } from '../config/events';
@@ -14,9 +15,14 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (!token || !user) return undefined;
+    if (!token || !user || !SOCKET_URL) return undefined;
 
-    const s = io(SOCKET_URL, { auth: { token }, transports: ['websocket', 'polling'] });
+    // Web: polling first — Metro/dev proxies often break the websocket upgrade.
+    const s = io(SOCKET_URL, {
+      auth: { token },
+      transports: Platform.OS === 'web' ? ['polling', 'websocket'] : ['websocket', 'polling'],
+      withCredentials: true,
+    });
     s.on('connect', () => setConnected(true));
     s.on('disconnect', () => setConnected(false));
     s.on(SOCKET_EVENTS.ACCOUNT_RESTRICTED, (notice: AccountNoticeInfo) => {

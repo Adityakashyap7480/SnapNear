@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
-import { Clock, IndianRupee, MapPin, Phone, Radio, User } from 'lucide-react-native';
+import { Clock, IndianRupee, LocateFixed, MapPin, Phone, Radio, User } from 'lucide-react-native';
+import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import DateInput from '../components/ui/DateInput';
 import { Input, Select, Textarea } from '../components/ui/FormField';
@@ -8,7 +9,6 @@ import Gradient from '../components/ui/Gradient';
 import { PageLoader } from '../components/ui/Spinner';
 import Text from '../components/ui/Text';
 import { FadeUp, Pulse } from '../components/ui/motion';
-import BookingHistory from '../components/booking/BookingHistory';
 import DurationTiles from '../components/booking/DurationTiles';
 import FareCard from '../components/booking/FareCard';
 import LiveStatusCard from '../components/booking/LiveStatusCard';
@@ -17,7 +17,8 @@ import ServicePicker from '../components/booking/ServicePicker';
 import PaymentCelebration, { type Celebration } from '../components/payment/PaymentCelebration';
 import TimeUpAlert from '../components/shoot/TimeUpAlert';
 import { bookingApi } from '../api/services';
-import { BOOKING_STATUS, type BookingStatus } from '../config/constants';
+import { BOOKING_STATUS, MATCH_RADIUS_KM, type BookingStatus } from '../config/constants';
+import { getCurrentPlace } from '../lib/location';
 import { BOOKING_EVENTS, SOCKET_EVENTS } from '../config/events';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
@@ -82,11 +83,14 @@ export default function BookScreen() {
     shootDate: todayISO(),
     timeSlot: catalog.timeSlots[0] || '',
     address: '',
+    latitude: null,
+    longitude: null,
     contactName: user?.name || '',
     contactPhone: user?.phone || '',
     notes: '',
   });
   const [errors, setErrors] = useState<FormErrors>({});
+  const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -193,9 +197,36 @@ export default function BookScreen() {
     setErrors((e) => ({ ...e, [name]: undefined }));
   };
 
+  const detectLocation = async () => {
+    setLocating(true);
+    try {
+      const place = await getCurrentPlace();
+      setForm((f) => ({
+        ...f,
+        address: place.address,
+        latitude: place.latitude,
+        longitude: place.longitude,
+      }));
+      setErrors((e) => ({ ...e, address: undefined }));
+      toast.success('Current location filled');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not get location');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  useEffect(() => {
+    void detectLocation();
+    // Auto-fill once when the book screen opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const validate = () => {
     const next: FormErrors = {};
-    if (form.address.trim().length < 8) next.address = 'Enter your full doorstep address (tower, flat, society)';
+    if (form.latitude == null || form.longitude == null || form.address.trim().length < 8) {
+      next.address = 'Allow current location — address fills automatically and stays locked';
+    }
     if (form.contactName.trim().length < 2) next.contactName = 'Enter contact name';
     if (!isValidPhone(form.contactPhone)) next.contactPhone = MESSAGES.PHONE;
     if (!form.shootDate || form.shootDate < todayISO()) next.shootDate = 'Pick today or a future date';
@@ -217,7 +248,12 @@ export default function BookScreen() {
     if (!tier) return;
     setSubmitting(true);
     try {
-      const { booking } = await bookingApi.create({ ...form, durationId: tier.id });
+      const { booking } = await bookingApi.create({
+        ...form,
+        durationId: tier.id,
+        latitude: form.latitude as number,
+        longitude: form.longitude as number,
+      });
       setBookings((prev) => [booking, ...(prev || [])]);
       setSelectedId(booking.id);
       playChime('broadcast');
@@ -250,7 +286,7 @@ export default function BookScreen() {
   const banner = `gap-3 overflow-hidden rounded-2xl p-4 ${sm ? 'flex-row items-center justify-between' : ''}`;
 
   return (
-    <View className="gap-6">
+    <View className="w-full gap-6" style={{ width: '100%' }}>
       {celebration && <PaymentCelebration key={celebration.key} celebration={celebration} onClose={closeCelebration} />}
       {timeUpBooking && <TimeUpAlert key={timeUpBooking.id} booking={timeUpBooking} role="customer" onDismiss={dismissTimeUp} />}
 
@@ -388,20 +424,26 @@ export default function BookScreen() {
               />
             </View>
             <Input
-              label="Doorstep location / Society address"
+              label="Current location (auto-filled)"
               name="address"
               icon={MapPin}
-              placeholder="Tower 4 - Flat 802, Gaur City 2, Greater Noida West"
+              placeholder="Detecting your current location…"
               value={form.address}
-              onChangeText={(v) => set('address', v)}
+              editable={false}
               error={errors.address}
+              hint="Locked from GPS — photographers within this area get your request"
               right={
                 <View className="flex-row items-center gap-1">
                   <Clock size={12} color={colors.emerald[600]} />
-                  <Text className="text-[10px] font-semibold text-emerald-600">Photographers within 5 km</Text>
+                  <Text className="text-[10px] font-semibold text-emerald-600">Within {MATCH_RADIUS_KM} km</Text>
                 </View>
               }
             />
+            {(!form.latitude || !form.address) && (
+              <Button variant="dark" icon={LocateFixed} loading={locating} onPress={detectLocation} className="w-full">
+                Use current location
+              </Button>
+            )}
             <Textarea
               label="Notes for photographer (optional)"
               name="notes"
@@ -427,26 +469,6 @@ export default function BookScreen() {
           />
         </View>
       </View>
-
-      <Card className="p-4 sm:p-6">
-        <View className="mb-2 flex-row items-start justify-between gap-2">
-          <View className="min-w-0 shrink">
-            <Text className="font-display text-base font-bold text-slate-900">My Bookings</Text>
-            <Text className="text-xs text-slate-500">Tap a booking to see its live status above.</Text>
-          </View>
-          <View className="rounded-full bg-slate-100 px-2.5 py-1">
-            <Text className="text-[11px] font-bold text-slate-600">{list.length} total</Text>
-          </View>
-        </View>
-        <BookingHistory
-          bookings={list}
-          selectedId={focused?.id}
-          onSelect={(b) => {
-            setSelectedId(b.id);
-            scrollToStatus();
-          }}
-        />
-      </Card>
     </View>
   );
 }

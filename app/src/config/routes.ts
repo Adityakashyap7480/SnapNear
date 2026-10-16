@@ -6,4 +6,7 @@ export const ROUTES = Object.freeze({
   BOOK: '/book',
   PARTNER: '/partner',
   OWNER: '/owner',
+  PROFILE: '/profile',
+  PROFILE_BOOKINGS: '/profile/bookings',
+  PROFILE_WALLET: '/profile/wallet',
 } as const);

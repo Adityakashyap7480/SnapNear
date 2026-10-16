@@ -80,7 +80,7 @@ function MarketingPanel() {
   const shorter = height <= 680;
   const pad = shorter ? 'px-8' : xl ? 'px-14' : 'px-10';
   const features = [
-    { icon: Zap, title: 'Instant doorstep dispatch', text: 'Verified photographers within 5 km get your request in seconds.' },
+    { icon: Zap, title: 'Instant doorstep dispatch', text: 'Verified photographers within 10 km get your request in seconds.' },
     { icon: ShieldCheck, title: 'Verified & experienced', text: 'Every SnapNear Partner is background-checked.' },
     { icon: IndianRupee, title: 'Transparent pricing', text: `Starts at ${formatINR(startingPrice.photo)}/hr. No surge, travel included.` },
   ];

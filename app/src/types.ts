@@ -17,9 +17,15 @@ export interface User {
   email: string;
   phone: string;
   city?: string;
+  /** Reverse-geocoded current location (partners). Read-only in the app. */
+  address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  locationUpdatedAt?: string | null;
   role: Role;
   creatorProfile?: CreatorProfile;
   needsPartnerTerms?: boolean;
+  needsPartnerLocation?: boolean;
   accountStatus?: AccountStatus;
 }
 
@@ -71,6 +77,7 @@ export interface Catalog {
   startOtpLength?: number;
   payoutHoldDays?: number;
   supportEmail?: string;
+  matchRadiusKm?: number;
 }
 
 export interface Payment {
@@ -123,6 +130,8 @@ export interface BookingForm {
   shootDate: string;
   timeSlot: string;
   address: string;
+  latitude: number | null;
+  longitude: number | null;
   contactName: string;
   contactPhone: string;
   notes: string;

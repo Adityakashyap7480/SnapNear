@@ -159,6 +159,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const wide = width >= 1024;
+  // Web keeps vertical centering; native starts at top so keyboard can scroll focused fields into view
+  const formAlign = isWeb && wide ? 'justify-center' : 'justify-start';
 
   return (
     <View className="flex-1 flex-row bg-white">
@@ -166,26 +168,31 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
       <KeyboardAvoidingView
         className="min-w-0 flex-1"
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+        // Android uses softwareKeyboardLayoutMode: 'resize' — avoid double-shrink with behavior=height
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+        style={{ flex: 1 }}
       >
         <ScrollView
           className="flex-1"
           contentContainerClassName="flex-grow"
           contentContainerStyle={{
             paddingTop: Math.max(insets.top, 12),
-            paddingBottom: Math.max(insets.bottom, 24) + 120,
+            paddingBottom: Math.max(insets.bottom, 24) + 160,
+            flexGrow: 1,
           }}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           automaticallyAdjustKeyboardInsets
+          contentInsetAdjustmentBehavior="automatic"
+          showsVerticalScrollIndicator={false}
         >
           {!wide && (
             <View className="px-6 pb-2 pt-2">
               <Logo />
             </View>
           )}
-          <View className="flex-1 items-center justify-center px-5 py-6 sm:px-10">
+          <View className={`flex-1 items-center px-5 py-6 sm:px-10 ${formAlign}`}>
             <FadeUp className="w-full max-w-md">{children}</FadeUp>
           </View>
           <Text className="pb-6 text-center text-[11px] text-slate-400">

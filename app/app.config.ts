@@ -37,12 +37,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: env.ANDROID_PACKAGE || 'in.snapnear.app',
     adaptiveIcon: {
-      // Matches brand logo gradient base so launcher icon is yellow→orange, not flat orange
-      backgroundColor: '#ffb347',
-      backgroundImage: './assets/android-icon-background.png',
       foregroundImage: './assets/android-icon-foreground.png',
+      backgroundColor: '#ff8008',
+      backgroundImage: './assets/android-icon-background.png',
       monochromeImage: './assets/android-icon-monochrome.png',
     },
+    // Resize window with keyboard so ScrollView can keep focused fields visible
+    softwareKeyboardLayoutMode: 'resize',
     permissions: [
       'VIBRATE',
       'RECEIVE_BOOT_COMPLETED',

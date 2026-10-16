@@ -29,24 +29,31 @@ const WEB_CLIENT_STUB = '000000000000-missing.apps.googleusercontent.com';
 
 /**
  * Google ID-token request for web + native.
- * Web must use the Web OAuth client only — Android client IDs cause invalid_client in the browser.
- * Callers must gate with `googleAuthConfigured` before prompting.
+ * Web: https origin (Vercel / localhost) — must be on the Web OAuth client.
+ * Android/iOS: do NOT pass a custom redirectUri — the Google provider uses
+ * `{applicationId}:/oauthredirect` (e.g. in.snapnear.app:/oauthredirect), which Google accepts.
+ * Custom schemes like snapnear:// are rejected by Google's Web client ("must contain a domain").
  */
 export function useGoogleIdTokenRequest() {
-  const redirectUri = AuthSession.makeRedirectUri({
-    scheme: 'snapnear',
-    preferLocalhost: true,
-  });
-
   const webId = webClientId || (Platform.OS === 'web' ? WEB_CLIENT_STUB : undefined);
 
+  if (Platform.OS === 'web') {
+    const redirectUri = AuthSession.makeRedirectUri({
+      preferLocalhost: typeof __DEV__ !== 'undefined' ? __DEV__ : false,
+    });
+    return Google.useIdTokenAuthRequest({
+      webClientId: webId,
+      clientId: webId,
+      redirectUri,
+      selectAccount: true,
+    });
+  }
+
+  // Native: let Google.useIdTokenAuthRequest pick Application.applicationId:/oauthredirect
   return Google.useIdTokenAuthRequest({
     webClientId: webId,
     androidClientId: androidClientId || undefined,
     iosClientId: iosClientId || undefined,
-    // Expo web / Metro: always the Web client
-    clientId: Platform.OS === 'web' ? webId : androidClientId || webClientId || undefined,
-    redirectUri,
     selectAccount: true,
   });
 }

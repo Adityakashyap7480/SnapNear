@@ -19,7 +19,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: env.APP_NAME || 'SnapNear',
   slug: env.EXPO_SLUG || 'snapnear',
   owner: env.EXPO_OWNER || 'aditya0804',
-  scheme: 'snapnear',
+  // snapnear = deep links; in.snapnear.app = Google OAuth redirect (Application.applicationId:/oauthredirect)
+  scheme: ['snapnear', 'in.snapnear.app'],
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/icon.png',

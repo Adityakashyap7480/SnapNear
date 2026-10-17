@@ -70,6 +70,9 @@ export const users = pgTable(
     statusReason: text('status_reason').notNull().default(''),
     statusChangedAt: ts('status_changed_at'),
     lastLoginAt: ts('last_login_at'),
+    /** SHA-256 of one-time password-reset token (raw token is emailed). */
+    passwordResetTokenHash: text('password_reset_token_hash'),
+    passwordResetExpiresAt: ts('password_reset_expires_at'),
     ...timestamps(),
   },
   (t) => [index('users_role_idx').on(t.role, t.createdAt)]

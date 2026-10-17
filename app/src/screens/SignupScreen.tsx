@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowRight, Briefcase, CalendarPlus, Camera, Check, Lock, Mail, MapPin, User, Video, Wrench, type LucideIcon } from 'lucide-react-native';
 import AuthLayout from '../components/layout/AuthLayout';
@@ -7,6 +8,7 @@ import Button from '../components/ui/Button';
 import { Checkbox, Input, PasswordInput, Select } from '../components/ui/FormField';
 import Text from '../components/ui/Text';
 import { FadeUp } from '../components/ui/motion';
+import { authApi } from '../api/services';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
 import { ROUTES } from '../config/routes';
@@ -16,6 +18,8 @@ import toast from '../lib/toast';
 import { colors } from '../theme/colors';
 import type { ApiFailure } from '../types';
 import { MESSAGES, isValidEmail, isValidPhone } from '../utils/validators';
+
+const PENDING_KEY = 'snapnear_pending_signup';
 
 const ROLE_OPTIONS: { id: 'client' | 'creator'; icon: LucideIcon; title: string; text: string; active: string; iconBox: string; iconColor: string }[] = [
   {
@@ -100,12 +104,17 @@ export default function SignupScreen() {
   const { width } = useWindowDimensions();
   const sm = width >= 640;
   const [request, response, promptAsync] = useGoogleIdTokenRequest();
-  // Form snapshot waiting for Google to finish (Join click → Google → create)
+  // Survives Android deep-link remount (oauthredirect) — memory alone is not enough
   const pendingRef = useRef<Form | null>(null);
-  const PENDING_KEY = 'snapnear_pending_signup';
+  const completingRef = useRef(false);
 
-  const savePending = (data: Form) => {
+  const savePending = async (data: Form) => {
     pendingRef.current = data;
+    try {
+      await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(data));
+    } catch {
+      /* ignore */
+    }
     try {
       if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(PENDING_KEY, JSON.stringify(data));
     } catch {
@@ -113,10 +122,15 @@ export default function SignupScreen() {
     }
   };
 
-  const takePending = (): Form | null => {
+  const takePending = async (): Promise<Form | null> => {
     const fromRef = pendingRef.current;
     pendingRef.current = null;
     if (fromRef) {
+      try {
+        await AsyncStorage.removeItem(PENDING_KEY);
+      } catch {
+        /* ignore */
+      }
       try {
         sessionStorage?.removeItem(PENDING_KEY);
       } catch {
@@ -125,16 +139,26 @@ export default function SignupScreen() {
       return fromRef;
     }
     try {
-      const raw = sessionStorage?.getItem(PENDING_KEY);
-      sessionStorage?.removeItem(PENDING_KEY);
+      const raw = (await AsyncStorage.getItem(PENDING_KEY)) || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(PENDING_KEY) : null);
+      await AsyncStorage.removeItem(PENDING_KEY);
+      try {
+        sessionStorage?.removeItem(PENDING_KEY);
+      } catch {
+        /* ignore */
+      }
       return raw ? (JSON.parse(raw) as Form) : null;
     } catch {
       return null;
     }
   };
 
-  const clearPending = () => {
+  const clearPending = async () => {
     pendingRef.current = null;
+    try {
+      await AsyncStorage.removeItem(PENDING_KEY);
+    } catch {
+      /* ignore */
+    }
     try {
       sessionStorage?.removeItem(PENDING_KEY);
     } catch {
@@ -214,37 +238,39 @@ export default function SignupScreen() {
     router.replace(homeFor(user.role));
   };
 
+  const finishWithGoogle = async (idToken: string) => {
+    if (completingRef.current) return;
+    completingRef.current = true;
+    try {
+      const data = await takePending();
+      if (!idToken || !data) {
+        setFormError('Google did not return a verified email. Try again.');
+        return;
+      }
+      await createWithGoogleToken(idToken, data);
+    } catch (err) {
+      const e = err as ApiFailure;
+      const fieldErrors = Object.fromEntries((e.details || []).map((d) => [d.field, d.message]));
+      setErrors(fieldErrors);
+      setFormError(e.message);
+      if (e.status === 409) toast(e.message);
+    } finally {
+      completingRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     if (!response) return;
     if (response.type !== 'success') {
       setSubmitting(false);
-      clearPending();
+      void clearPending();
       if (response.type === 'error') {
         setFormError('Google sign-in failed. Please try again.');
       }
       return;
     }
-
-    const idToken = response.params.id_token;
-    const data = takePending();
-    if (!idToken || !data) {
-      setSubmitting(false);
-      setFormError('Google did not return a verified email. Try again.');
-      return;
-    }
-
-    (async () => {
-      try {
-        await createWithGoogleToken(idToken, data);
-      } catch (err) {
-        const e = err as ApiFailure;
-        const fieldErrors = Object.fromEntries((e.details || []).map((d) => [d.field, d.message]));
-        setErrors(fieldErrors);
-        setFormError(e.message);
-      } finally {
-        setSubmitting(false);
-      }
-    })();
+    void finishWithGoogle(response.params.id_token);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [response]);
 
@@ -261,22 +287,38 @@ export default function SignupScreen() {
       return;
     }
 
-    savePending({ ...form, email: form.email.trim().toLowerCase() });
+    const email = form.email.trim().toLowerCase();
     setFormError('');
     setSubmitting(true);
     try {
-      const result = await promptAsync({ showInRecents: true });
-      if (result.type !== 'success') {
+      const { available } = await authApi.checkEmail(email);
+      if (!available) {
+        setFormError('An account with this email already exists. Please log in.');
         setSubmitting(false);
-        clearPending();
+        return;
+      }
+    } catch (err) {
+      setFormError((err as ApiFailure).message || 'Could not verify email. Try again.');
+      setSubmitting(false);
+      return;
+    }
+
+    await savePending({ ...form, email });
+    try {
+      const result = await promptAsync({ showInRecents: true });
+      if (result.type === 'success' && result.params.id_token) {
+        // Android may unmount this screen on deep link — finish here, not only via useEffect
+        await finishWithGoogle(result.params.id_token);
+      } else {
+        setSubmitting(false);
+        await clearPending();
         if (result.type === 'dismiss' || result.type === 'cancel') {
           toast('Google verification cancelled');
         }
       }
-      // success is handled in the useEffect via `response`
     } catch {
       setSubmitting(false);
-      clearPending();
+      await clearPending();
       setFormError('Could not open Google sign-in');
     }
   };
@@ -284,7 +326,7 @@ export default function SignupScreen() {
   const row = sm ? 'flex-row gap-3.5' : 'gap-3.5';
 
   return (
-    <AuthLayout>
+    <AuthLayout center={false}>
       <View>
         <Text className="text-xs font-bold uppercase tracking-wider text-brand-orange">Get started free</Text>
         <Text role="heading" className="mt-1 font-display text-3xl font-extrabold tracking-tight text-slate-900">

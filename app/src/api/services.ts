@@ -8,6 +8,11 @@ export const authApi = {
   signup: (data: Record<string, unknown>) => request<Session>('POST', '/auth/signup', { data }),
   /** Verified Google ID token → login existing user or create with profile fields. */
   google: (data: Record<string, unknown>) => request<Session>('POST', '/auth/google', { data }),
+  checkEmail: (email: string) => request<{ available: boolean }>('POST', '/auth/check-email', { data: { email } }),
+  forgotPassword: (email: string) =>
+    request<{ success: boolean; message: string }>('POST', '/auth/forgot-password', { data: { email } }),
+  resetPassword: (data: { token: string; password: string }) =>
+    request<{ success: boolean; message: string }>('POST', '/auth/reset-password', { data }),
   me: () => request<{ user: User }>('GET', '/auth/me'),
   updateMe: (data: {
     name?: string;

@@ -107,6 +107,16 @@ export default function LoginScreen() {
           returnKeyType="go"
           onSubmitEditing={onSubmit}
         />
+        <View className="-mt-1 mb-1 flex-row justify-end">
+          <Pressable
+            accessibilityRole="link"
+            testID="forgot-password"
+            onPress={() => router.push(ROUTES.FORGOT_PASSWORD)}
+            hitSlop={8}
+          >
+            <Text className="text-xs font-semibold text-brand-orange">Forgot password?</Text>
+          </Pressable>
+        </View>
 
         <Button testID="login-submit" size="lg" loading={submitting} onPress={onSubmit} iconAfter={submitting ? undefined : ArrowRight} className="w-full">
           {submitting ? 'Signing in...' : 'Log in'}

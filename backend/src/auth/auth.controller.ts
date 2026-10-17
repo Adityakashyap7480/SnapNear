@@ -1,16 +1,22 @@
 import { Body, Controller, Get, HttpCode, Patch, Post } from '@nestjs/common';
 import { ZodPipe } from '../common/zod.pipe.js';
 import {
+  type CheckEmailInput,
   type ClearPushTokenInput,
+  type ForgotPasswordInput,
   type GoogleAuthInput,
   type LoginInput,
   type PushTokenInput,
+  type ResetPasswordInput,
   type SignupInput,
   type UpdateMeInput,
+  checkEmailSchema,
   clearPushTokenSchema,
+  forgotPasswordSchema,
   googleAuthSchema,
   loginSchema,
   pushTokenSchema,
+  resetPasswordSchema,
   signupSchema,
   updateMeSchema,
 } from '../common/validation.js';
@@ -38,11 +44,30 @@ export class AuthController {
     return this.auth.login(body);
   }
 
+  /** True when this email can be used for a new SnapNear account. */
+  @Post('check-email')
+  @HttpCode(200)
+  checkEmail(@Body(new ZodPipe(checkEmailSchema)) body: CheckEmailInput) {
+    return this.auth.checkEmail(body.email);
+  }
+
   /** Verify Google ID token, then log in or create the SnapNear account. */
   @Post('google')
   @HttpCode(200)
   google(@Body(new ZodPipe(googleAuthSchema)) body: GoogleAuthInput) {
     return this.auth.google(body);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(200)
+  forgotPassword(@Body(new ZodPipe(forgotPasswordSchema)) body: ForgotPasswordInput) {
+    return this.auth.forgotPassword(body);
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  resetPassword(@Body(new ZodPipe(resetPasswordSchema)) body: ResetPasswordInput) {
+    return this.auth.resetPassword(body);
   }
 
   @Get('me')

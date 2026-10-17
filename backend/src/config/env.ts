@@ -74,6 +74,18 @@ export const env = {
     .filter(Boolean),
   supportEmail: text('SUPPORT_EMAIL', 'supportsnear@gmail.com'),
 
+  /** Public web app URL used in password-reset emails (Vercel). */
+  appPublicUrl: text('APP_PUBLIC_URL', 'https://snap-near.vercel.app').replace(/\/$/, ''),
+
+  /** Optional SMTP for forgot-password emails. Without these, links are logged in development only. */
+  smtp: {
+    host: read('SMTP_HOST'),
+    port: number('SMTP_PORT', 587, { min: 1, max: 65535 }),
+    user: read('SMTP_USER'),
+    pass: process.env.SMTP_PASS ?? '',
+    from: text('SMTP_FROM', ''),
+  },
+
   /** Google OAuth client IDs allowed to mint ID tokens (web / Android / iOS). Comma-separated. */
   googleClientIds: text('GOOGLE_CLIENT_IDS', '')
     .split(',')

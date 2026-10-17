@@ -99,6 +99,18 @@ export const googleAuthSchema = z
   });
 export type GoogleAuthInput = z.output<typeof googleAuthSchema>;
 
+export const checkEmailSchema = z.object({ email });
+export type CheckEmailInput = z.output<typeof checkEmailSchema>;
+
+export const forgotPasswordSchema = z.object({ email });
+export type ForgotPasswordInput = z.output<typeof forgotPasswordSchema>;
+
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(20, 'Invalid or expired reset link'),
+  password,
+});
+export type ResetPasswordInput = z.output<typeof resetPasswordSchema>;
+
 const durationIds = [...new Set(Object.values(PRICING_TIERS).flat().map((t) => t.id))];
 
 export const createBookingSchema = z.object({

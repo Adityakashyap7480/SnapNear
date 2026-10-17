@@ -155,12 +155,17 @@ function MarketingPanel() {
   );
 }
 
-export default function AuthLayout({ children }: { children: ReactNode }) {
+export default function AuthLayout({
+  children,
+  /** Short screens (login) center vertically; long forms (signup) stay top-aligned with tight bottom. */
+  center = true,
+}: {
+  children: ReactNode;
+  center?: boolean;
+}) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const wide = width >= 1024;
-  // Web keeps vertical centering; native starts at top so keyboard can scroll focused fields into view
-  const formAlign = isWeb && wide ? 'justify-center' : 'justify-start';
 
   return (
     <View className="flex-1 flex-row bg-white">
@@ -178,7 +183,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           contentContainerClassName="flex-grow"
           contentContainerStyle={{
             paddingTop: Math.max(insets.top, 12),
-            paddingBottom: Math.max(insets.bottom, 24) + 160,
+            paddingBottom: Math.max(insets.bottom, 16) + (center ? 24 : 32),
             flexGrow: 1,
           }}
           keyboardShouldPersistTaps="handled"
@@ -188,14 +193,16 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
           showsVerticalScrollIndicator={false}
         >
           {!wide && (
-            <View className="px-6 pb-2 pt-2">
+            <View className="px-6 pb-1 pt-2">
               <Logo />
             </View>
           )}
-          <View className={`flex-1 items-center px-5 py-6 sm:px-10 ${formAlign}`}>
+          <View
+            className={`flex-1 items-center px-5 sm:px-10 ${center ? 'justify-center py-4' : 'justify-start py-4'}`}
+          >
             <FadeUp className="w-full max-w-md">{children}</FadeUp>
           </View>
-          <Text className="pb-6 text-center text-[11px] text-slate-400">
+          <Text className="pb-3 pt-1 text-center text-[11px] text-slate-400">
             © {new Date().getFullYear()} SnapNear Technologies • Verified photographers at your doorstep
           </Text>
         </ScrollView>

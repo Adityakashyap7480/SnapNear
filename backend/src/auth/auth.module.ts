@@ -3,10 +3,11 @@ import rateLimit from 'express-rate-limit';
 import { env } from '../config/env.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
+import { MailService } from './mail.service.js';
 
 @Module({
   controllers: [AuthController],
-  providers: [AuthService],
+  providers: [AuthService, MailService],
 })
 export class AuthModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
@@ -24,7 +25,10 @@ export class AuthModule implements NestModule {
       .forRoutes(
         { path: 'auth/signup', method: RequestMethod.POST },
         { path: 'auth/login', method: RequestMethod.POST },
-        { path: 'auth/google', method: RequestMethod.POST }
+        { path: 'auth/google', method: RequestMethod.POST },
+        { path: 'auth/check-email', method: RequestMethod.POST },
+        { path: 'auth/forgot-password', method: RequestMethod.POST },
+        { path: 'auth/reset-password', method: RequestMethod.POST }
       );
   }
 }

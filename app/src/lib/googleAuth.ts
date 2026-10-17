@@ -31,9 +31,10 @@ const WEB_CLIENT_STUB = '000000000000-missing.apps.googleusercontent.com';
 /**
  * Google ID-token request for web + native.
  * Web: https origin (Vercel / localhost) — must be on the Web OAuth client.
- * Android/iOS: do NOT pass a custom redirectUri — the Google provider uses
- * `{applicationId}:/oauthredirect` (e.g. in.snapnear.app:/oauthredirect), which Google accepts.
- * Custom schemes like snapnear:// are rejected by Google's Web client ("must contain a domain").
+ * Android: Expo uses `{package}:/oauthredirect` (in.snapnear.app:/oauthredirect).
+ * Google Cloud → Android OAuth client → Advanced → enable "Custom URI scheme"
+ * or Error 400: "Custom URI scheme is not enabled for your Android client".
+ * Do NOT pass snapnear:// — Web clients reject non-https redirect URIs.
  */
 export function useGoogleIdTokenRequest() {
   const webId = webClientId || (Platform.OS === 'web' ? WEB_CLIENT_STUB : undefined);
@@ -50,7 +51,7 @@ export function useGoogleIdTokenRequest() {
     });
   }
 
-  // Native: let Google.useIdTokenAuthRequest pick Application.applicationId:/oauthredirect
+  // Native: package scheme redirect (requires Custom URI scheme enabled on Android client)
   return Google.useIdTokenAuthRequest({
     webClientId: webId,
     androidClientId: androidClientId || undefined,

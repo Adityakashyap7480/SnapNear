@@ -13,7 +13,24 @@ export class MailService {
       port: env.smtp.port,
       secure: env.smtp.port === 465,
       auth: { user: env.smtp.user, pass: env.smtp.pass },
+      // Render/Gmail hangs forever without these — fail fast so the app shows a real error
+      connectionTimeout: 8_000,
+      greetingTimeout: 8_000,
+      socketTimeout: 12_000,
     });
+  }
+
+  private async sendOrThrow(
+    transport: NonNullable<ReturnType<MailService['transporter']>>,
+    mail: { from: string; to: string; subject: string; text: string; html: string }
+  ) {
+    try {
+      await transport.sendMail(mail);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log.error(`SMTP send failed to ${mail.to}: ${msg}`);
+      throw new Error('Could not send email. Check SMTP settings on the server.');
+    }
   }
 
   async sendSignupOtp(to: string, otp: string) {
@@ -44,7 +61,7 @@ export class MailService {
       return { sent: false as const, logged: true as const };
     }
 
-    await transport.sendMail({
+    await this.sendOrThrow(transport, {
       from: env.smtp.from || env.smtp.user,
       to,
       subject,
@@ -83,7 +100,7 @@ export class MailService {
       return { sent: false as const, logged: true as const };
     }
 
-    await transport.sendMail({
+    await this.sendOrThrow(transport, {
       from: env.smtp.from || env.smtp.user,
       to,
       subject,

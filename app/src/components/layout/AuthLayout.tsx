@@ -111,10 +111,14 @@ function MarketingPanel() {
         {/* Always show — was hidden when height ≤ 820px */}
         <View className={`flex-row gap-4 border-t border-white/10 ${short ? 'px-8 py-6' : xl ? 'px-14 py-10' : 'px-10 py-10'}`}>
           {features.map(({ icon: Icon, title, text }) => (
-            <View key={title} className="flex-1">
-              <Icon size={20} color={colors.brand.yellow} />
-              <Text className="mt-2 text-xs font-bold text-white">{title}</Text>
-              <Text className="mt-0.5 text-[11px] leading-[18px] text-slate-400">{text}</Text>
+            <View key={title} className="flex-1 flex-row items-center gap-3">
+              <View className="h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5">
+                <Icon size={18} color={colors.brand.yellow} />
+              </View>
+              <View className="min-w-0 flex-1">
+                <Text className="text-xs font-bold text-white">{title}</Text>
+                <Text className="mt-0.5 text-[11px] leading-[18px] text-slate-400">{text}</Text>
+              </View>
             </View>
           ))}
         </View>

@@ -7,18 +7,24 @@ import {
   type GoogleAuthInput,
   type LoginInput,
   type PushTokenInput,
+  type RequestSignupOtpInput,
+  type ResendSignupOtpInput,
   type ResetPasswordInput,
   type SignupInput,
   type UpdateMeInput,
+  type VerifySignupOtpInput,
   checkEmailSchema,
   clearPushTokenSchema,
   forgotPasswordSchema,
   googleAuthSchema,
   loginSchema,
   pushTokenSchema,
+  requestSignupOtpSchema,
+  resendSignupOtpSchema,
   resetPasswordSchema,
   signupSchema,
   updateMeSchema,
+  verifySignupOtpSchema,
 } from '../common/validation.js';
 import { PushService } from '../notifications/push.service.js';
 import { ROLES } from '../constants/roles.js';
@@ -36,6 +42,25 @@ export class AuthController {
   @HttpCode(201)
   signup(@Body(new ZodPipe(signupSchema)) body: SignupInput) {
     return this.auth.signup(body);
+  }
+
+  /** Send a 6-digit email OTP; account is created only after verify. */
+  @Post('signup/request-otp')
+  @HttpCode(200)
+  requestSignupOtp(@Body(new ZodPipe(requestSignupOtpSchema)) body: RequestSignupOtpInput) {
+    return this.auth.requestSignupOtp(body);
+  }
+
+  @Post('signup/resend-otp')
+  @HttpCode(200)
+  resendSignupOtp(@Body(new ZodPipe(resendSignupOtpSchema)) body: ResendSignupOtpInput) {
+    return this.auth.resendSignupOtp(body);
+  }
+
+  @Post('signup/verify-otp')
+  @HttpCode(201)
+  verifySignupOtp(@Body(new ZodPipe(verifySignupOtpSchema)) body: VerifySignupOtpInput) {
+    return this.auth.verifySignupOtp(body);
   }
 
   @Post('login')

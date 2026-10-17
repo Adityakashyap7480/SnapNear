@@ -1,13 +1,35 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+import { isRunningInExpoGo } from 'expo';
 import { ROUTES } from './routes';
 
 const trimSlash = (url = '') => url.replace(/\/$/, '');
 const isWeb = Platform.OS === 'web';
 
+/**
+ * Dev-only fallback for Expo Go on a physical phone.
+ * Never runs in production builds (__DEV__ false) or outside Expo Go,
+ * so a deployed app always uses EXPO_PUBLIC_API_URL / same-origin only.
+ */
+function lanDevApiOrigin(): string {
+  if (isWeb || !__DEV__ || !isRunningInExpoGo()) return '';
+  // hostUri looks like "172.20.10.3:8081"
+  const host = Constants.expoConfig?.hostUri?.split(':')[0]?.trim() ?? '';
+  if (!host || host === 'localhost' || host === '127.0.0.1') return '';
+  return `http://${host}:5000`;
+}
+
 /** Backend origin. Empty on web means the same domain (dev proxy); the phone app needs the full URL. */
-export const API_ORIGIN = trimSlash(process.env.EXPO_PUBLIC_API_URL);
+export const API_ORIGIN = trimSlash(process.env.EXPO_PUBLIC_API_URL) || lanDevApiOrigin();
 export const API_BASE_URL = `${API_ORIGIN}/api`;
 export const API_TIMEOUT_MS = 15000;
+
+// Release APK/IPA must be built with EXPO_PUBLIC_API_URL (see app/eas.json). Never ship empty.
+if (!isWeb && !__DEV__ && !API_ORIGIN) {
+  console.error(
+    '[SnapNear] EXPO_PUBLIC_API_URL is missing in this release build. Set it in eas.json before building the APK.'
+  );
+}
 
 /**
  * Socket.io needs a real backend host in local Expo web — Metro's HTTP proxy does not

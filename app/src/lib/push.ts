@@ -1,26 +1,50 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
+import { isRunningInExpoGo } from 'expo';
 import { authApi } from '../api/services';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
 
+/**
+ * Expo Go on Android no longer ships remote-push native modules
+ * (ExpoTopicSubscriptionModule). Importing expo-notifications there throws
+ * and takes down the whole app — skip the package until a dev build.
+ */
+const pushUnsupported = Platform.OS === 'android' && isRunningInExpoGo();
+
+let Notifications: NotificationsModule | null = null;
+let handlerReady = false;
 let cachedToken: string | null = null;
 let channelReady = false;
 
-async function ensureAndroidChannel() {
+async function loadNotifications(): Promise<NotificationsModule | null> {
+  if (pushUnsupported) return null;
+  if (Notifications) return Notifications;
+  try {
+    Notifications = await import('expo-notifications');
+    if (!handlerReady) {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowBanner: true,
+          shouldShowList: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+        }),
+      });
+      handlerReady = true;
+    }
+    return Notifications;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureAndroidChannel(n: NotificationsModule) {
   if (Platform.OS !== 'android' || channelReady) return;
-  await Notifications.setNotificationChannelAsync('shoots', {
+  await n.setNotificationChannelAsync('shoots', {
     name: 'Shoot alerts',
-    importance: Notifications.AndroidImportance.MAX,
+    importance: n.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 150, 250],
     lightColor: '#ff8008',
     sound: 'default',
@@ -38,20 +62,23 @@ export async function registerForPush(): Promise<string | null> {
   if (!Device.isDevice) return null;
 
   try {
-    await ensureAndroidChannel();
+    const n = await loadNotifications();
+    if (!n) return null;
 
-    const current = await Notifications.getPermissionsAsync();
+    await ensureAndroidChannel(n);
+
+    const current = await n.getPermissionsAsync();
     let status = current.status;
     if (status !== 'granted') {
-      const asked = await Notifications.requestPermissionsAsync();
+      const asked = await n.requestPermissionsAsync();
       status = asked.status;
     }
     if (status !== 'granted') return null;
 
     const id = projectId();
     const tokenRes = id
-      ? await Notifications.getExpoPushTokenAsync({ projectId: id })
-      : await Notifications.getExpoPushTokenAsync();
+      ? await n.getExpoPushTokenAsync({ projectId: id })
+      : await n.getExpoPushTokenAsync();
     const token = tokenRes.data;
     if (!token) return null;
 
@@ -73,7 +100,8 @@ export async function unregisterPush() {
     // Best-effort on logout
   }
   try {
-    await Notifications.setBadgeCountAsync(0);
+    const n = await loadNotifications();
+    if (n) await n.setBadgeCountAsync(0);
   } catch {
     // ignore
   }
@@ -83,7 +111,8 @@ export async function unregisterPush() {
 export async function clearAppBadge() {
   if (Platform.OS === 'web') return;
   try {
-    await Notifications.setBadgeCountAsync(0);
+    const n = await loadNotifications();
+    if (n) await n.setBadgeCountAsync(0);
   } catch {
     // ignore
   }

@@ -62,8 +62,8 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <View className="w-full flex-1 bg-slate-50" style={{ width: '100%', flex: 1 }}>
-        <CatalogProvider>
-          <AuthProvider>
+        <AuthProvider>
+          <CatalogProvider>
             <SocketProvider>
               <Stack
                 screenOptions={{
@@ -73,8 +73,8 @@ export default function RootLayout() {
               />
               <CheckoutHost />
             </SocketProvider>
-          </AuthProvider>
-        </CatalogProvider>
+          </CatalogProvider>
+        </AuthProvider>
         <Toaster />
       </View>
     </SafeAreaProvider>

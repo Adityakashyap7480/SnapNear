@@ -16,7 +16,6 @@ export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
-  const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async () => {
@@ -29,9 +28,13 @@ export default function ForgotPasswordScreen() {
     setFormError('');
     setSubmitting(true);
     try {
-      const res = await authApi.forgotPassword(email.trim().toLowerCase());
-      setSent(true);
-      toast.success(res.message);
+      const normalized = email.trim().toLowerCase();
+      const res = await authApi.forgotPassword(normalized);
+      toast.success(res.devOtp ? 'Use the code on the next screen (SMTP not set)' : 'Check your email for a 6-digit code');
+      router.push({
+        pathname: ROUTES.RESET_PASSWORD,
+        params: { email: normalized, ...(res.devOtp ? { devOtp: res.devOtp } : {}) },
+      });
     } catch (err) {
       setFormError((err as ApiFailure).message);
     } finally {
@@ -56,7 +59,7 @@ export default function ForgotPasswordScreen() {
           Forgot password?
         </Text>
         <Text className="mt-2 text-sm text-slate-500">
-          Enter your account email and we will send a reset link if it is registered with SnapNear.
+          Enter your account email. If it is registered, we will send a 6-digit code so you can set a new password in the app.
         </Text>
       </View>
 
@@ -64,13 +67,6 @@ export default function ForgotPasswordScreen() {
         {formError ? (
           <View className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5">
             <Text className="text-xs font-semibold text-red-700">{formError}</Text>
-          </View>
-        ) : null}
-        {sent ? (
-          <View className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5">
-            <Text className="text-xs font-semibold text-emerald-800">
-              If that email is registered, check your inbox for the reset link (also check spam).
-            </Text>
           </View>
         ) : null}
 
@@ -97,7 +93,7 @@ export default function ForgotPasswordScreen() {
         />
 
         <Button testID="forgot-submit" size="lg" loading={submitting} onPress={onSubmit} className="w-full">
-          {submitting ? 'Sending…' : 'Send reset link'}
+          {submitting ? 'Sending…' : 'Send code'}
         </Button>
       </View>
     </AuthLayout>

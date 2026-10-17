@@ -1,25 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowRight, Briefcase, CalendarPlus, Camera, Check, Lock, Mail, MapPin, User, Video, Wrench, type LucideIcon } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Briefcase, CalendarPlus, Camera, Check, Lock, Mail, MapPin, User, Video, Wrench, type LucideIcon } from 'lucide-react-native';
 import AuthLayout from '../components/layout/AuthLayout';
 import Button from '../components/ui/Button';
 import { Checkbox, Input, PasswordInput, Select } from '../components/ui/FormField';
+import OtpInput from '../components/ui/OtpInput';
 import Text from '../components/ui/Text';
 import { FadeUp } from '../components/ui/motion';
 import { authApi } from '../api/services';
 import { useAuth } from '../context/AuthContext';
-import { useCatalog } from '../context/CatalogContext';
 import { ROUTES } from '../config/routes';
-import { googleAuthConfigured, googleNotConfiguredMessage, useGoogleIdTokenRequest } from '../lib/googleAuth';
 import { homeFor } from '../lib/roleHome';
 import toast from '../lib/toast';
 import { colors } from '../theme/colors';
 import type { ApiFailure } from '../types';
 import { MESSAGES, isValidEmail, isValidPhone } from '../utils/validators';
-
-const PENDING_KEY = 'snapnear_pending_signup';
 
 const ROLE_OPTIONS: { id: 'client' | 'creator'; icon: LucideIcon; title: string; text: string; active: string; iconBox: string; iconColor: string }[] = [
   {
@@ -48,22 +44,6 @@ const SERVICE_OPTIONS = [
 ];
 
 const EXPERIENCE_OPTIONS = [0, 1, 2, 3, 4, 5, 6, 8, 10, 15].map((y) => ({ value: String(y), label: y === 0 ? '< 1 year' : `${y}+ years` }));
-
-function readGoogleClaims(idToken: string): { email?: string; name?: string } {
-  try {
-    const part = idToken.split('.')[1];
-    const normalized = part.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-    if (typeof atob !== 'function') return {};
-    const json = JSON.parse(atob(padded)) as { email?: string; name?: string };
-    return {
-      email: json.email ? String(json.email).toLowerCase() : undefined,
-      name: json.name ? String(json.name) : undefined,
-    };
-  } catch {
-    return {};
-  }
-}
 
 function passwordStrength(pw: string) {
   let score = 0;
@@ -98,73 +78,19 @@ interface Form {
 type Errors = Partial<Record<keyof Form, string>>;
 
 export default function SignupScreen() {
-  const { googleAuth } = useAuth();
-  const { partnerPct, platformPct } = useCatalog();
+  const { verifySignupOtp } = useAuth();
+  // Marketing/terms copy — live split still comes from catalog after login.
+  const partnerPct = '80%';
+  const platformPct = '20%';
   const params = useLocalSearchParams<{ role?: string; email?: string; name?: string }>();
   const { width } = useWindowDimensions();
   const sm = width >= 640;
-  const [request, response, promptAsync] = useGoogleIdTokenRequest();
-  // Survives Android deep-link remount (oauthredirect) — memory alone is not enough
-  const pendingRef = useRef<Form | null>(null);
-  const completingRef = useRef(false);
 
-  const savePending = async (data: Form) => {
-    pendingRef.current = data;
-    try {
-      await AsyncStorage.setItem(PENDING_KEY, JSON.stringify(data));
-    } catch {
-      /* ignore */
-    }
-    try {
-      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(PENDING_KEY, JSON.stringify(data));
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const takePending = async (): Promise<Form | null> => {
-    const fromRef = pendingRef.current;
-    pendingRef.current = null;
-    if (fromRef) {
-      try {
-        await AsyncStorage.removeItem(PENDING_KEY);
-      } catch {
-        /* ignore */
-      }
-      try {
-        sessionStorage?.removeItem(PENDING_KEY);
-      } catch {
-        /* ignore */
-      }
-      return fromRef;
-    }
-    try {
-      const raw = (await AsyncStorage.getItem(PENDING_KEY)) || (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(PENDING_KEY) : null);
-      await AsyncStorage.removeItem(PENDING_KEY);
-      try {
-        sessionStorage?.removeItem(PENDING_KEY);
-      } catch {
-        /* ignore */
-      }
-      return raw ? (JSON.parse(raw) as Form) : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const clearPending = async () => {
-    pendingRef.current = null;
-    try {
-      await AsyncStorage.removeItem(PENDING_KEY);
-    } catch {
-      /* ignore */
-    }
-    try {
-      sessionStorage?.removeItem(PENDING_KEY);
-    } catch {
-      /* ignore */
-    }
-  };
+  const [step, setStep] = useState<'form' | 'otp'>('form');
+  const [otp, setOtp] = useState('');
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [otpError, setOtpError] = useState('');
+  const [resending, setResending] = useState(false);
 
   const [form, setForm] = useState<Form>({
     role: ['partner', 'creator'].includes(String(params.role)) ? 'creator' : 'client',
@@ -185,6 +111,7 @@ export default function SignupScreen() {
 
   const strength = useMemo(() => passwordStrength(form.password), [form.password]);
   const isCreator = form.role === 'creator';
+  const email = form.email.trim().toLowerCase();
 
   const set = <K extends keyof Form>(name: K, value: Form[K]) => {
     setForm((f) => ({ ...f, [name]: value }));
@@ -211,119 +138,155 @@ export default function SignupScreen() {
     return Object.keys(next).length === 0;
   };
 
-  const createWithGoogleToken = async (idToken: string, data: Form) => {
-    const claims = readGoogleClaims(idToken);
-    const formEmail = data.email.trim().toLowerCase();
-    if (claims.email && claims.email !== formEmail) {
-      throw {
-        message: `Google email (${claims.email}) must match the email you entered (${formEmail}).`,
-      } satisfies ApiFailure;
-    }
+  const signupPayload = () => ({
+    role: form.role,
+    name: form.name.trim(),
+    email,
+    phone: form.phone.trim(),
+    city: form.city.trim(),
+    password: form.password,
+    ...(form.role === 'creator' && {
+      services: form.services,
+      experienceYears: Number(form.experienceYears),
+      gear: form.gear.trim(),
+    }),
+  });
 
-    const payload = {
-      idToken,
-      role: data.role,
-      name: data.name.trim(),
-      phone: data.phone.trim(),
-      city: data.city.trim(),
-      password: data.password,
-      ...(data.role === 'creator' && {
-        services: data.services,
-        experienceYears: Number(data.experienceYears),
-        gear: data.gear.trim(),
-      }),
-    };
-    const user = await googleAuth(payload);
-    toast.success(`Welcome to SnapNear, ${user.name.split(' ')[0]}!`);
-    router.replace(homeFor(user.role));
-  };
-
-  const finishWithGoogle = async (idToken: string) => {
-    if (completingRef.current) return;
-    completingRef.current = true;
-    try {
-      const data = await takePending();
-      if (!idToken || !data) {
-        setFormError('Google did not return a verified email. Try again.');
-        return;
-      }
-      await createWithGoogleToken(idToken, data);
-    } catch (err) {
-      const e = err as ApiFailure;
-      const fieldErrors = Object.fromEntries((e.details || []).map((d) => [d.field, d.message]));
-      setErrors(fieldErrors);
-      setFormError(e.message);
-      if (e.status === 409) toast(e.message);
-    } finally {
-      completingRef.current = false;
-      setSubmitting(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!response) return;
-    if (response.type !== 'success') {
-      setSubmitting(false);
-      void clearPending();
-      if (response.type === 'error') {
-        setFormError('Google sign-in failed. Please try again.');
-      }
-      return;
-    }
-    void finishWithGoogle(response.params.id_token);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [response]);
-
-  /** Same form as before — Google opens only after Join / Create. */
-  const onSubmit = async () => {
+  const onSubmitForm = async () => {
     if (submitting || !validate()) return;
-
-    if (!googleAuthConfigured) {
-      setFormError(googleNotConfiguredMessage());
-      return;
-    }
-    if (!request) {
-      setFormError('Google sign-in is still loading. Wait a second and try again.');
-      return;
-    }
-
-    const email = form.email.trim().toLowerCase();
     setFormError('');
     setSubmitting(true);
     try {
-      const { available } = await authApi.checkEmail(email);
-      if (!available) {
-        setFormError('An account with this email already exists. Please log in.');
-        setSubmitting(false);
-        return;
-      }
+      const res = await authApi.requestSignupOtp(signupPayload());
+      setDevOtp(res.devOtp || null);
+      setOtp('');
+      setOtpError('');
+      setStep('otp');
+      toast.success(res.devOtp ? 'Use the code shown below (email SMTP not set yet)' : `Code sent to ${email}`);
     } catch (err) {
-      setFormError((err as ApiFailure).message || 'Could not verify email. Try again.');
+      const e = err as ApiFailure;
+      const fieldErrors = Object.fromEntries((e.details || []).map((d) => [d.field, d.message]));
+      setErrors(fieldErrors as Errors);
+      setFormError(e.message);
+      if (e.status === 409) toast(e.message);
+    } finally {
       setSubmitting(false);
-      return;
     }
+  };
 
-    await savePending({ ...form, email });
+  const completeWithOtp = async (code: string) => {
+    if (submitting || code.length !== 6) return;
+    setSubmitting(true);
+    setOtpError('');
     try {
-      const result = await promptAsync({ showInRecents: true });
-      if (result.type === 'success' && result.params.id_token) {
-        // Android may unmount this screen on deep link — finish here, not only via useEffect
-        await finishWithGoogle(result.params.id_token);
-      } else {
-        setSubmitting(false);
-        await clearPending();
-        if (result.type === 'dismiss' || result.type === 'cancel') {
-          toast('Google verification cancelled');
-        }
-      }
-    } catch {
+      const user = await verifySignupOtp({ email, otp: code });
+      toast.success(`Welcome to SnapNear, ${user.name.split(' ')[0]}!`);
+      router.replace(homeFor(user.role));
+    } catch (err) {
+      const e = err as ApiFailure;
+      setOtpError(e.message);
+      setOtp('');
+    } finally {
       setSubmitting(false);
-      await clearPending();
-      setFormError('Could not open Google sign-in');
+    }
+  };
+
+  const onResend = async () => {
+    if (resending || submitting) return;
+    setResending(true);
+    setOtpError('');
+    try {
+      const res = await authApi.resendSignupOtp(email);
+      setDevOtp(res.devOtp || null);
+      setOtp('');
+      toast.success(res.devOtp ? 'New code ready (shown below)' : 'New code sent to your email');
+    } catch (err) {
+      setOtpError((err as ApiFailure).message);
+    } finally {
+      setResending(false);
     }
   };
 
   const row = sm ? 'flex-row gap-3.5' : 'gap-3.5';
+
+  if (step === 'otp') {
+    return (
+      <AuthLayout>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            setStep('form');
+            setOtp('');
+            setOtpError('');
+            setDevOtp(null);
+          }}
+          className="mb-4 flex-row items-center gap-1.5 self-start"
+          hitSlop={8}
+        >
+          <ArrowLeft size={16} color={colors.slate[600]} />
+          <Text className="text-sm font-semibold text-slate-600">Back</Text>
+        </Pressable>
+
+        <View>
+          <Text className="text-xs font-bold uppercase tracking-wider text-brand-orange">Almost there</Text>
+          <Text role="heading" className="mt-1 font-display text-3xl font-extrabold tracking-tight text-slate-900">
+            Verify your email
+          </Text>
+          <Text className="mt-2 text-sm text-slate-500">
+            Enter the 6-digit code we sent to <Text className="text-sm font-semibold text-slate-900">{email}</Text>
+          </Text>
+        </View>
+
+        <View className="mt-8 gap-5">
+          {devOtp ? (
+            <View className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5">
+              <Text className="text-xs font-semibold text-amber-800">
+                Dev mode (SMTP not configured): your code is{' '}
+                <Text className="text-xs font-extrabold tracking-widest text-amber-950">{devOtp}</Text>
+              </Text>
+            </View>
+          ) : null}
+
+          {otpError ? (
+            <View className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5">
+              <Text className="text-xs font-semibold text-red-700">{otpError}</Text>
+            </View>
+          ) : null}
+
+          <OtpInput
+            value={otp}
+            onChange={setOtp}
+            length={6}
+            autoFocus
+            disabled={submitting}
+            error={Boolean(otpError)}
+            onComplete={completeWithOtp}
+            id="signup-otp"
+            label="Email verification code"
+          />
+
+          <Button
+            testID="signup-verify"
+            size="lg"
+            variant={isCreator ? 'violet' : 'primary'}
+            loading={submitting}
+            disabled={otp.length !== 6}
+            onPress={() => void completeWithOtp(otp)}
+            iconAfter={submitting ? undefined : ArrowRight}
+            className="w-full"
+          >
+            {submitting ? 'Verifying...' : 'Verify & continue'}
+          </Button>
+
+          <Pressable accessibilityRole="button" onPress={onResend} disabled={resending || submitting} className="items-center py-1">
+            <Text className={`text-sm font-semibold ${resending ? 'text-slate-400' : 'text-brand-orange'}`}>
+              {resending ? 'Sending...' : "Didn't get it? Resend code"}
+            </Text>
+          </Pressable>
+        </View>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout center={false}>
@@ -493,7 +456,7 @@ export default function SignupScreen() {
         </View>
 
         <Text className="text-center text-[11px] leading-4 text-slate-500">
-          After you tap {isCreator ? 'Join as Partner' : 'Create Customer Account'}, Google will ask you to verify this email.
+          We&apos;ll email a 6-digit code to verify your address before your account is created.
         </Text>
 
         <Button
@@ -501,11 +464,11 @@ export default function SignupScreen() {
           size="lg"
           variant={isCreator ? 'violet' : 'primary'}
           loading={submitting}
-          onPress={onSubmit}
+          onPress={onSubmitForm}
           iconAfter={submitting ? undefined : ArrowRight}
           className="w-full"
         >
-          {submitting ? 'Opening Google...' : isCreator ? 'Join as Partner' : 'Create Customer Account'}
+          {submitting ? 'Sending code...' : isCreator ? 'Join as Partner' : 'Create Customer Account'}
         </Button>
       </View>
     </AuthLayout>

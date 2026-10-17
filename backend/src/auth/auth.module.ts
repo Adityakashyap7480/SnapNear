@@ -24,6 +24,9 @@ export class AuthModule implements NestModule {
       .apply(authLimiter)
       .forRoutes(
         { path: 'auth/signup', method: RequestMethod.POST },
+        { path: 'auth/signup/request-otp', method: RequestMethod.POST },
+        { path: 'auth/signup/resend-otp', method: RequestMethod.POST },
+        { path: 'auth/signup/verify-otp', method: RequestMethod.POST },
         { path: 'auth/login', method: RequestMethod.POST },
         { path: 'auth/google', method: RequestMethod.POST },
         { path: 'auth/check-email', method: RequestMethod.POST },

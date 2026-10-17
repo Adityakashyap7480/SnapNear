@@ -14,7 +14,7 @@ interface AuthValue {
   initializing: boolean;
   login: (credentials: { email: string; password: string }) => Promise<User>;
   signup: (payload: Record<string, unknown>) => Promise<User>;
-  googleAuth: (payload: Record<string, unknown>) => Promise<User>;
+  verifySignupOtp: (payload: { email: string; otp: string }) => Promise<User>;
   logout: () => void;
   accountNotice: AccountNoticeInfo | null;
   setAccountNotice: (notice: AccountNoticeInfo | null) => void;
@@ -104,14 +104,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [persistSession]
   );
   const signup = useCallback(async (payload: Record<string, unknown>) => persistSession(await authApi.signup(payload)), [persistSession]);
-  const googleAuth = useCallback(
-    async (payload: Record<string, unknown>) => persistSession(await authApi.google(payload)),
+  const verifySignupOtp = useCallback(
+    async (payload: { email: string; otp: string }) => persistSession(await authApi.verifySignupOtp(payload)),
     [persistSession]
   );
 
   const value = useMemo(
-    () => ({ token, user, setUser, initializing, login, signup, googleAuth, logout, accountNotice, setAccountNotice }),
-    [token, user, initializing, login, signup, googleAuth, logout, accountNotice]
+    () => ({ token, user, setUser, initializing, login, signup, verifySignupOtp, logout, accountNotice, setAccountNotice }),
+    [token, user, initializing, login, signup, verifySignupOtp, logout, accountNotice]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

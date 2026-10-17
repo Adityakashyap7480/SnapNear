@@ -10,15 +10,14 @@ import { type CreatorProfile, type NewCreatorProfile, type UserRow, creatorProfi
 export type User = Omit<UserRow, 'passwordHash'> & { creatorProfile: CreatorProfile | null };
 export type UserWithPassword = User & { passwordHash: string };
 
-export interface NewUser {
+export type NewUser = {
   role: UserRow['role'];
   name: string;
   email: string;
   phone: string;
-  password: string;
   city?: string;
   creatorProfile: Omit<NewCreatorProfile, 'userId'> | null;
-}
+} & ({ password: string; passwordHash?: never } | { passwordHash: string; password?: never });
 
 const { passwordHash: _passwordHash, ...publicColumns } = getTableColumns(users);
 
@@ -71,8 +70,8 @@ export class UsersRepository {
     return Boolean(row);
   }
 
-  async create({ creatorProfile, password, ...fields }: NewUser): Promise<User> {
-    const passwordHash = await bcrypt.hash(password, env.bcryptRounds);
+  async create({ creatorProfile, password, passwordHash: existingHash, ...fields }: NewUser): Promise<User> {
+    const passwordHash = existingHash || (await bcrypt.hash(password!, env.bcryptRounds));
     return this.db.transaction(async (tx) => {
       const [{ passwordHash: _hash, ...user }] = await tx
         .insert(users)

@@ -102,6 +102,16 @@ export default function BookScreen() {
     if (!form.timeSlot && catalog.timeSlots[0]) setForm((f) => ({ ...f, timeSlot: catalog.timeSlots[0] }));
   }, [catalog]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Profile name/phone edits must flow into Step 4 contact fields
+  useEffect(() => {
+    if (!user) return;
+    setForm((f) => ({
+      ...f,
+      contactName: user.name || f.contactName,
+      contactPhone: user.phone || f.contactPhone,
+    }));
+  }, [user?.name, user?.phone]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const tiers = catalog.tiers[form.serviceType] || [];
   const tier = tiers.find((t) => t.id === form.durationId) || tiers[0];
   const serviceLabel = form.serviceType === 'photo' ? 'Photos Only' : 'Video & Cinema';

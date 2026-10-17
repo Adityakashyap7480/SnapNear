@@ -220,6 +220,17 @@ export const bookingDeclines = pgTable(
   (t) => [primaryKey({ columns: [t.bookingId, t.creatorId] })]
 );
 
+/** Pending email OTP during signup (deleted after verify or expiry). */
+export const signupOtps = pgTable('signup_otps', {
+  email: text('email').primaryKey(),
+  otpHash: text('otp_hash').notNull(),
+  /** JSON of validated SignupInput (password stored as bcrypt hash). */
+  payload: text('payload').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  expiresAt: ts('expires_at').notNull(),
+  createdAt: ts('created_at').notNull().defaultNow(),
+});
+
 /** Expo push tokens so partners/customers get alerts when the app is in the background. */
 export const deviceTokens = pgTable(
   'device_tokens',

@@ -9,6 +9,7 @@
       "environment": "preview",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://snapnear-api.onrender.com",
+        "EXPO_PUBLIC_WEB_URL": "https://snap-near.vercel.app",
         "EXPO_PUBLIC_SUPPORT_EMAIL": "supportsnear@gmail.com",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "476462008168-kqfeep0ivv6ro4rgls0rooprgl01p2iq.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "476462008168-pt4pfus3ri2i4vcbh4u9086fnnlvfe2u.apps.googleusercontent.com"
@@ -19,7 +20,17 @@
     },
     "production": {
       "autoIncrement": true,
-      "environment": "production"
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://snapnear-api.onrender.com",
+        "EXPO_PUBLIC_WEB_URL": "https://snap-near.vercel.app",
+        "EXPO_PUBLIC_SUPPORT_EMAIL": "supportsnear@gmail.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "476462008168-kqfeep0ivv6ro4rgls0rooprgl01p2iq.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "476462008168-pt4pfus3ri2i4vcbh4u9086fnnlvfe2u.apps.googleusercontent.com"
+      },
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

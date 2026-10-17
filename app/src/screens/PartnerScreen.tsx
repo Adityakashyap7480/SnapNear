@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
 import { Camera, CheckCheck, History, Locate, Power, Radar, Star, Wallet } from 'lucide-react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -49,6 +49,13 @@ export default function PartnerScreen() {
   const [qrJob, setQrJob] = useState<Booking | null>(null);
   const [celebration, setCelebration] = useState<(Celebration & { key: string }) | null>(null);
   const celebrated = useRef(new Set<string>());
+
+  // After saving UPI in My Wallet, hide the warning as soon as partner returns here.
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload])
+  );
 
   // The QR poll and the socket event can both report the same payment; celebrate it once.
   const celebratePayment = useCallback(
@@ -289,14 +296,14 @@ export default function PartnerScreen() {
       </Card>
 
       {!hasUpi && (
-        <Card className="border-amber-200 bg-amber-50 p-4">
+        <Card className="border-red-300 bg-red-50 p-4">
           <View className="flex-row items-start gap-3">
-            <View className="mt-0.5 h-9 w-9 items-center justify-center rounded-xl bg-amber-100">
-              <Wallet size={18} color={colors.amber[600]} />
+            <View className="mt-0.5 h-9 w-9 items-center justify-center rounded-xl bg-red-100">
+              <Wallet size={18} color={colors.red[600]} />
             </View>
             <View className="min-w-0 flex-1 gap-2">
-              <Text className="font-display text-sm font-bold text-slate-900">Add your UPI ID to accept shoots</Text>
-              <Text className="text-xs leading-5 text-slate-600">
+              <Text className="font-display text-sm font-bold text-red-700">Add your UPI ID to accept shoots</Text>
+              <Text className="text-xs font-semibold leading-5 text-red-600">
                 Go to My Wallet and save your UPI ID for payouts first. You cannot accept a shoot until this is done.
                 You can update it anytime from Profile → My Wallet.
               </Text>

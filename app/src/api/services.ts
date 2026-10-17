@@ -3,15 +3,32 @@ import type { Booking, BookingForm, Catalog, CreatorDashboard, RazorpayCheckout,
 
 const byId = (id: string) => ({ pathParams: { id } });
 
+export type SignupOtpResponse = {
+  success: boolean;
+  email: string;
+  expiresInSeconds: number;
+  message: string;
+  /** Present only in local/dev when SMTP is not configured. */
+  devOtp?: string;
+};
+
 export const authApi = {
   login: (data: { email: string; password: string }) => request<Session>('POST', '/auth/login', { data }),
   signup: (data: Record<string, unknown>) => request<Session>('POST', '/auth/signup', { data }),
-  /** Verified Google ID token → login existing user or create with profile fields. */
-  google: (data: Record<string, unknown>) => request<Session>('POST', '/auth/google', { data }),
+  requestSignupOtp: (data: Record<string, unknown>) =>
+    request<SignupOtpResponse>('POST', '/auth/signup/request-otp', { data }),
+  resendSignupOtp: (email: string) =>
+    request<SignupOtpResponse>('POST', '/auth/signup/resend-otp', { data: { email } }),
+  verifySignupOtp: (data: { email: string; otp: string }) =>
+    request<Session>('POST', '/auth/signup/verify-otp', { data }),
   checkEmail: (email: string) => request<{ available: boolean }>('POST', '/auth/check-email', { data: { email } }),
   forgotPassword: (email: string) =>
-    request<{ success: boolean; message: string }>('POST', '/auth/forgot-password', { data: { email } }),
-  resetPassword: (data: { token: string; password: string }) =>
+    request<{ success: boolean; message: string; email: string; expiresInSeconds: number; devOtp?: string }>(
+      'POST',
+      '/auth/forgot-password',
+      { data: { email } }
+    ),
+  resetPassword: (data: { email: string; otp: string; password: string }) =>
     request<{ success: boolean; message: string }>('POST', '/auth/reset-password', { data }),
   me: () => request<{ user: User }>('GET', '/auth/me'),
   updateMe: (data: {

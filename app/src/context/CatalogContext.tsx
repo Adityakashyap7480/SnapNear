@@ -7,6 +7,7 @@ import Logo from '../components/ui/Logo';
 import { PageLoader } from '../components/ui/Spinner';
 import Text from '../components/ui/Text';
 import { SUPPORT_EMAIL } from '../config/constants';
+import { useAuth } from './AuthContext';
 import type { ApiFailure, Catalog } from '../types';
 import { pct } from '../utils/format';
 
@@ -24,14 +25,18 @@ interface CatalogValue {
 
 const CatalogContext = createContext<CatalogValue | null>(null);
 
-/** Loads prices, the revenue split and app settings once so no screen hardcodes them. */
+/**
+ * Loads prices only after the user is signed in.
+ * Login / signup stay free of /api/catalog (marketing is hardcoded there).
+ */
 export function CatalogProvider({ children }: { children: ReactNode }) {
+  const { user, initializing } = useAuth();
+  const needsCatalog = Boolean(user) && !initializing;
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [error, setError] = useState('');
 
   const load = useCallback(() => {
     setError('');
-    setCatalog(null);
     catalogApi
       .get()
       .then((res) => {
@@ -44,7 +49,19 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       .catch((err: ApiFailure) => setError(err.message || 'Unable to reach SnapNear servers'));
   }, []);
 
-  useEffect(load, [load]);
+  useEffect(() => {
+    if (!needsCatalog) return;
+    if (catalog) return;
+    load();
+  }, [needsCatalog, catalog, load]);
+
+  // Logged out: drop cached catalog so the next login refetches
+  useEffect(() => {
+    if (!user && !initializing) {
+      setCatalog(null);
+      setError('');
+    }
+  }, [user, initializing]);
 
   const value = useMemo(() => {
     if (!catalog) return null;
@@ -62,21 +79,34 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     };
   }, [catalog]);
 
+  // Guests (login/signup): no catalog fetch, screens must not call useCatalog
+  if (!needsCatalog) {
+    return <>{children}</>;
+  }
+
   if (error) {
     return (
       <View className="flex-1 items-center justify-center gap-4 bg-slate-50 px-4">
         <Logo />
         <Text className="text-center text-sm font-semibold text-slate-700">{error}</Text>
-        <Button variant="dark" icon={RefreshCw} onPress={load}>
+        <Button
+          variant="dark"
+          icon={RefreshCw}
+          onPress={() => {
+            setCatalog(null);
+            load();
+          }}
+        >
           Try again
         </Button>
       </View>
     );
   }
+
   if (!value) {
     return (
       <View className="flex-1 bg-slate-50">
-        <PageLoader />
+        <PageLoader label="Loading SnapNear..." />
       </View>
     );
   }
@@ -86,6 +116,6 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
 
 export function useCatalog() {
   const ctx = useContext(CatalogContext);
-  if (!ctx) throw new Error('useCatalog must be used inside CatalogProvider');
+  if (!ctx) throw new Error('useCatalog must be used inside CatalogProvider on an authenticated screen');
   return ctx;
 }

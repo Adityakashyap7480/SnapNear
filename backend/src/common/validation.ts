@@ -102,11 +102,32 @@ export type GoogleAuthInput = z.output<typeof googleAuthSchema>;
 export const checkEmailSchema = z.object({ email });
 export type CheckEmailInput = z.output<typeof checkEmailSchema>;
 
+/** Same fields as signup — creates a pending OTP instead of the account. */
+export const requestSignupOtpSchema = signupSchema;
+export type RequestSignupOtpInput = SignupInput;
+
+export const verifySignupOtpSchema = z.object({
+  email,
+  otp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, 'Enter the 6-digit code from your email'),
+});
+export type VerifySignupOtpInput = z.output<typeof verifySignupOtpSchema>;
+
+export const resendSignupOtpSchema = z.object({ email });
+export type ResendSignupOtpInput = z.output<typeof resendSignupOtpSchema>;
+
 export const forgotPasswordSchema = z.object({ email });
 export type ForgotPasswordInput = z.output<typeof forgotPasswordSchema>;
 
+/** In-app reset: email OTP + new password (no browser link). */
 export const resetPasswordSchema = z.object({
-  token: z.string().trim().min(20, 'Invalid or expired reset link'),
+  email,
+  otp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, 'Enter the 6-digit code from your email'),
   password,
 });
 export type ResetPasswordInput = z.output<typeof resetPasswordSchema>;

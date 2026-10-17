@@ -2,8 +2,7 @@ import { Pressable, View } from 'react-native';
 import { Ban, Clock, Mail } from 'lucide-react-native';
 import Text from '../ui/Text';
 import { FadeUp } from '../ui/motion';
-import { ACCOUNT_STATUS } from '../../config/constants';
-import { useCatalog } from '../../context/CatalogContext';
+import { ACCOUNT_STATUS, SUPPORT_EMAIL } from '../../config/constants';
 import { openLink } from '../../lib/links';
 import { colors } from '../../theme/colors';
 import type { AccountNoticeInfo } from '../../types';
@@ -42,11 +41,10 @@ function supportMailto(supportEmail: string, status: string, email?: string) {
 }
 
 export default function AccountNotice({ notice }: { notice: AccountNoticeInfo }) {
-  const { supportEmail: catalogSupportEmail } = useCatalog();
   const status = notice.account?.status === ACCOUNT_STATUS.BLOCKED ? ACCOUNT_STATUS.BLOCKED : ACCOUNT_STATUS.SUSPENDED;
   const v = VARIANTS[status];
   const Icon = v.icon;
-  const supportEmail = notice.account?.supportEmail || catalogSupportEmail;
+  const supportEmail = notice.account?.supportEmail || SUPPORT_EMAIL;
   const reason = notice.account?.reason;
 
   return (

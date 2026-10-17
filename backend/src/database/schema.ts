@@ -48,7 +48,7 @@ export const bookingStatus = pgEnum('booking_status', values(BOOKING_STATUS));
 export const paymentStatus = pgEnum('payment_status', values(PAYMENT_STATUS));
 export const paymentVia = pgEnum('payment_via', ['app', 'qr']);
 export const settlementStatus = pgEnum('settlement_status', values(SETTLEMENT_STATUS));
-export const cancelledBy = pgEnum('cancelled_by', ['client', 'superadmin']);
+export const cancelledBy = pgEnum('cancelled_by', ['client', 'creator', 'superadmin']);
 
 /** Customers and partners. The Super Admin is not stored in the database. */
 export const users = pgTable(
@@ -89,7 +89,9 @@ export const creatorProfiles = pgTable('creator_profiles', {
   bio: text('bio').notNull().default(''),
   isOnline: boolean('is_online').notNull().default(false),
   isVerified: boolean('is_verified').notNull().default(true),
+  /** Running average of client stars (1–5). Starts at 5 until the first real rating. */
   rating: numeric('rating', { precision: 2, scale: 1, mode: 'number' }).notNull().default(5),
+  ratingCount: integer('rating_count').notNull().default(0),
   upiId: text('upi_id').notNull().default(''),
   termsVersion: text('terms_version').notNull().default(''),
   termsAcceptedAt: ts('terms_accepted_at'),
@@ -167,6 +169,8 @@ export const bookings = pgTable(
     completedAt: ts('completed_at'),
     cancelledAt: ts('cancelled_at'),
     cancelledBy: cancelledBy('cancelled_by'),
+    cancelReason: text('cancel_reason').notNull().default(''),
+    cancelRemark: text('cancel_remark').notNull().default(''),
 
     // Issued when the partner reaches the venue; only the customer sees the code.
     // The partner enters it to start the shoot, which also starts the countdown.
@@ -202,6 +206,30 @@ export const bookings = pgTable(
     uniqueIndex('bookings_one_active_job_per_creator')
       .on(t.creatorId)
       .where(sql`${t.status} in (${sql.raw(ACTIVE_JOB_STATUSES.map((s) => `'${s}'`).join(', '))})`),
+  ]
+);
+
+/** One client rating per paid booking — drives the partner's average rating. */
+export const bookingRatings = pgTable(
+  'booking_ratings',
+  {
+    id: id(),
+    bookingId: text('booking_id')
+      .notNull()
+      .references(() => bookings.id, { onDelete: 'cascade' }),
+    creatorId: text('creator_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    clientId: text('client_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    stars: integer('stars').notNull(),
+    remark: text('remark').notNull().default(''),
+    ...timestamps(),
+  },
+  (t) => [
+    uniqueIndex('booking_ratings_booking_uidx').on(t.bookingId),
+    index('booking_ratings_creator_idx').on(t.creatorId, t.createdAt),
   ]
 );
 
@@ -254,4 +282,5 @@ export type CreatorProfile = typeof creatorProfiles.$inferSelect;
 export type NewCreatorProfile = typeof creatorProfiles.$inferInsert;
 export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;
+export type BookingRating = typeof bookingRatings.$inferSelect;
 export type Payout = typeof payouts.$inferSelect;

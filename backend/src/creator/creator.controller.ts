@@ -1,7 +1,9 @@
 import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import { type AppUser, Auth, CurrentUser } from '../auth/auth.guard.js';
 import {
+  type CancelBookingInput,
   type UpdateCreatorProfileInput,
+  cancelBookingSchema,
   dutyStatusSchema,
   startShootSchema,
   updateCreatorProfileSchema,
@@ -55,6 +57,16 @@ export class CreatorController {
   @Patch('jobs/:id/advance')
   advanceJob(@Param('id') id: string, @CurrentUser() user: AppUser) {
     return this.creator.advanceJob(id, user);
+  }
+
+  /** Cancel assigned/arrived job before OTP (reason required). */
+  @Patch('jobs/:id/cancel')
+  cancelJob(
+    @Param('id') id: string,
+    @CurrentUser() user: AppUser,
+    @Body(new ZodPipe(cancelBookingSchema)) body: CancelBookingInput
+  ) {
+    return this.creator.cancelJob(id, user, body);
   }
 
   @Post('jobs/:id/start')

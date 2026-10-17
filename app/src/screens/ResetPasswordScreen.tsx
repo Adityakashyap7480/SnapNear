@@ -98,6 +98,11 @@ export default function ResetPasswordScreen() {
             'Open Forgot password first and request a code.'
           )}
         </Text>
+        {email ? (
+          <Text className="mt-2 text-xs font-semibold text-amber-600">
+            Tip: Also check Spam / Junk if the code isn’t in your inbox.
+          </Text>
+        ) : null}
       </View>
 
       <View className="mt-6 gap-4">

@@ -147,7 +147,27 @@ export const createBookingSchema = z.object({
   contactPhone: phone,
   notes: z.string().trim().max(300).optional().default(''),
 });
+
+/** Client rates the partner after payment. Remarks required for 1–3 stars. */
+export const rateBookingSchema = z
+  .object({
+    stars: z.coerce.number().int().min(1, 'Pick 1–5 stars').max(5, 'Pick 1–5 stars'),
+    remark: z.string().trim().max(300).optional().default(''),
+  })
+  .superRefine((d, ctx) => {
+    if (d.stars <= 3 && !d.remark.trim()) {
+      ctx.addIssue({ code: 'custom', message: 'Please share a short remark for 3 stars or below', path: ['remark'] });
+    }
+  });
+export type RateBookingInput = z.output<typeof rateBookingSchema>;
 export type CreateBookingInput = z.output<typeof createBookingSchema>;
+
+/** Cancel with a fixed reason + optional remark (client or partner). */
+export const cancelBookingSchema = z.object({
+  reason: z.string().trim().min(3, 'Pick a cancel reason').max(120),
+  remark: z.string().trim().max(300).optional().default(''),
+});
+export type CancelBookingInput = z.output<typeof cancelBookingSchema>;
 
 export const dutyStatusSchema = z.object({
   isOnline: z.boolean(),

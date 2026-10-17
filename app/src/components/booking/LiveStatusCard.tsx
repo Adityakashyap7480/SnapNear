@@ -26,7 +26,8 @@ const STEP_TEXT: Partial<Record<BookingStatus, { label: string; eta: string }>> 
   [BOOKING_STATUS.COMPLETED]: { label: 'Shoot completed 🎉', eta: 'Done' },
 };
 
-const CANCELLABLE: BookingStatus[] = [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.ASSIGNED];
+/** Customer can cancel until the shoot OTP starts the timer. */
+const CANCELLABLE: BookingStatus[] = [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.ARRIVED];
 
 interface LiveStatusCardProps {
   booking: Booking | null;

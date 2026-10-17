@@ -235,6 +235,9 @@ export default function SignupScreen() {
           <Text className="mt-2 text-sm text-slate-500">
             Enter the 6-digit code we sent to <Text className="text-sm font-semibold text-slate-900">{email}</Text>
           </Text>
+          <Text className="mt-2 text-xs font-semibold text-amber-600">
+            Tip: Also check Spam / Junk if the code isn’t in your inbox.
+          </Text>
         </View>
 
         <View className="mt-8 gap-5">

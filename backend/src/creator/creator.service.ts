@@ -4,7 +4,7 @@ import type { AppUser } from '../auth/auth.guard.js';
 import { ApiError } from '../common/api-error.js';
 import { serializeBooking } from '../common/serializers.js';
 import { CLEARED_START_OTP, isStartOtpMatch, newStartOtp, shootMinutesFor } from '../common/shoot-otp.js';
-import type { UpdateCreatorProfileInput } from '../common/validation.js';
+import type { CancelBookingInput, UpdateCreatorProfileInput } from '../common/validation.js';
 import { env } from '../config/env.js';
 import { ADMIN_EVENTS, BOOKING_EVENTS, BOOKING_EVENT_BY_STATUS } from '../constants/events.js';
 import {
@@ -65,6 +65,8 @@ export class CreatorService {
 
   private async computeStats(creatorId: string) {
     const today = gte(bookings.completedAt, startOfToday());
+    // Count only paid completed shoots — shoot count rises after the customer pays.
+    const paidDone = and(eq(bookings.status, BOOKING_STATUS.COMPLETED), eq(bookings.paymentStatus, PAYMENT_STATUS.PAID));
     const [row] = await this.db
       .select({
         completed: countOf(),
@@ -74,7 +76,7 @@ export class CreatorService {
         todayCompleted: countOf(today),
       })
       .from(bookings)
-      .where(and(eq(bookings.creatorId, creatorId), eq(bookings.status, BOOKING_STATUS.COMPLETED)));
+      .where(and(eq(bookings.creatorId, creatorId), paidDone));
     return row;
   }
 
@@ -288,6 +290,30 @@ export class CreatorService {
       .onConflictDoNothing();
 
     return { success: true };
+  }
+
+  /** Partner may cancel before the shoot OTP (assigned or arrived only). */
+  async cancelJob(id: string, current: AppUser, data: CancelBookingInput) {
+    const booking = await this.bookings.update(
+      and(
+        ownJob(id, current),
+        inArray(bookings.status, [BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.ARRIVED])
+      ),
+      {
+        status: BOOKING_STATUS.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledBy: 'creator',
+        cancelReason: data.reason,
+        cancelRemark: data.remark.trim(),
+      }
+    );
+
+    if (!booking) {
+      throw ApiError.conflict('You can only cancel before the shoot starts (before OTP)');
+    }
+
+    this.realtime.notifyBookingChange(booking, BOOKING_EVENTS.CANCELLED);
+    return { success: true, booking: serializeBooking(booking) };
   }
 
   async advanceJob(id: string, current: AppUser) {

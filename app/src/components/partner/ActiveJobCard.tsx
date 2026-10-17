@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
-import { Check, MessageCircle, Navigation, PhoneCall, type LucideIcon } from 'lucide-react-native';
+import { Check, MessageCircle, Navigation, PhoneCall, X, type LucideIcon } from 'lucide-react-native';
 import Button from '../ui/Button';
 import Gradient from '../ui/Gradient';
 import Text from '../ui/Text';
@@ -26,8 +26,12 @@ interface ActiveJobCardProps {
   job: Booking;
   onAdvance: (job: Booking) => void;
   onStartShoot: (job: Booking, otp: string) => Promise<unknown>;
+  onCancel?: (job: Booking) => void;
   busy: boolean;
+  cancelling?: boolean;
 }
+
+const PARTNER_CAN_CANCEL = new Set([BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.ARRIVED]);
 
 function Detail({ label, children, full = false, wide }: { label: string; children: ReactNode; full?: boolean; wide: boolean }) {
   return (
@@ -48,11 +52,12 @@ function LinkButton({ icon: Icon, label, onPress }: { icon: LucideIcon; label: s
   );
 }
 
-export default function ActiveJobCard({ job, onAdvance, onStartShoot, busy }: ActiveJobCardProps) {
+export default function ActiveJobCard({ job, onAdvance, onStartShoot, onCancel, busy, cancelling }: ActiveJobCardProps) {
   const { width } = useWindowDimensions();
   const sm = width >= 640;
   const action = CREATOR_NEXT_ACTION[job.status];
   const currentIdx = STEPS.findIndex((s) => s.key === job.status);
+  const canCancel = Boolean(onCancel) && PARTNER_CAN_CANCEL.has(job.status);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}`;
   const waText = encodeURIComponent(`Hi ${job.client.name}, this is your SnapNear photographer for ${job.code}. I'm on my way!`);
 
@@ -121,6 +126,22 @@ export default function ActiveJobCard({ job, onAdvance, onStartShoot, busy }: Ac
           </Button>
         )}
       </View>
+
+      {canCancel ? (
+        <Button
+          testID="partner-cancel-job"
+          variant="danger"
+          size="sm"
+          onPress={() => onCancel?.(job)}
+          loading={cancelling}
+          disabled={busy}
+          icon={X}
+          iconSize={14}
+          className="self-stretch"
+        >
+          Cancel this shoot
+        </Button>
+      ) : null}
     </View>
   );
 }

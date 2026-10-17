@@ -4,13 +4,13 @@ import type { AppUser } from '../auth/auth.guard.js';
 import { ApiError } from '../common/api-error.js';
 import { serializeBooking } from '../common/serializers.js';
 import { newStartOtp, shootMinutesFor } from '../common/shoot-otp.js';
-import type { CreateBookingInput } from '../common/validation.js';
+import type { CancelBookingInput, CreateBookingInput, RateBookingInput } from '../common/validation.js';
 import { env } from '../config/env.js';
 import { BOOKING_EVENTS } from '../constants/events.js';
 import { getQuote } from '../constants/pricing.js';
 import { BOOKING_STATUS, type BookingStatus, PAYMENT_STATUS } from '../constants/roles.js';
 import { DatabaseService } from '../database/database.service.js';
-import { bookings } from '../database/schema.js';
+import { bookingRatings, bookings, creatorProfiles } from '../database/schema.js';
 import { PushService } from '../notifications/push.service.js';
 import { PaymentsService, isPaymentDue } from '../payments/payments.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
@@ -129,10 +129,20 @@ export class BookingsService {
     return { success: true, booking: serializeBooking(await this.bookings.withCreator(booking), { includeStartOtp: true }) };
   }
 
-  async cancel(id: string, current: AppUser) {
+  /** Customer may cancel until the shoot starts (searching → arrived). */
+  async cancel(id: string, current: AppUser, data: CancelBookingInput) {
     const booking = await this.bookings.update(
-      and(ownBooking(id, current), inArray(bookings.status, [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.ASSIGNED])),
-      { status: BOOKING_STATUS.CANCELLED, cancelledAt: new Date(), cancelledBy: 'client' }
+      and(
+        ownBooking(id, current),
+        inArray(bookings.status, [BOOKING_STATUS.SEARCHING, BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.ARRIVED])
+      ),
+      {
+        status: BOOKING_STATUS.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledBy: 'client',
+        cancelReason: data.reason,
+        cancelRemark: data.remark.trim(),
+      }
     );
 
     if (!booking) {
@@ -142,5 +152,56 @@ export class BookingsService {
     const withPartner = await this.bookings.withCreator(booking);
     this.realtime.notifyBookingChange(withPartner, BOOKING_EVENTS.CANCELLED);
     return { success: true, booking: serializeBooking(withPartner) };
+  }
+
+  /** Client rates the assigned partner after payment; updates the partner's average. */
+  async rate(id: string, current: AppUser, data: RateBookingInput) {
+    const booking = await this.bookings.find(ownBooking(id, current));
+    if (!booking) throw ApiError.notFound('Booking not found');
+    if (booking.paymentStatus !== PAYMENT_STATUS.PAID) {
+      throw ApiError.conflict('You can rate after the payment is complete');
+    }
+    if (!booking.creatorId) throw ApiError.conflict('No photographer was assigned to this shoot');
+
+    const existing = await this.database.db
+      .select({ id: bookingRatings.id })
+      .from(bookingRatings)
+      .where(eq(bookingRatings.bookingId, booking.id))
+      .limit(1);
+    if (existing[0]) throw ApiError.conflict('You already rated this shoot');
+
+    const stars = data.stars;
+    const remark = data.remark.trim();
+
+    await this.database.db.transaction(async (tx) => {
+      await tx.insert(bookingRatings).values({
+        bookingId: booking.id,
+        creatorId: booking.creatorId!,
+        clientId: current.doc.id,
+        stars,
+        remark,
+      });
+
+      const [profile] = await tx
+        .select({ rating: creatorProfiles.rating, ratingCount: creatorProfiles.ratingCount })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.userId, booking.creatorId!))
+        .limit(1);
+
+      const prevCount = profile?.ratingCount ?? 0;
+      const prevAvg = profile?.rating ?? 5;
+      const nextCount = prevCount + 1;
+      const nextAvg = prevCount === 0 ? stars : Math.round(((prevAvg * prevCount + stars) / nextCount) * 10) / 10;
+
+      await tx
+        .update(creatorProfiles)
+        .set({ rating: nextAvg, ratingCount: nextCount })
+        .where(eq(creatorProfiles.userId, booking.creatorId!));
+    });
+
+    return {
+      success: true,
+      rating: { stars, remark, bookingId: booking.id },
+    };
   }
 }

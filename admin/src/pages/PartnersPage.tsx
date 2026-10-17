@@ -139,6 +139,7 @@ export default function PartnersPage() {
                         <span className="flex shrink-0 items-center gap-0.5 text-[10px] font-bold text-amber-600">
                           <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
                           {c.rating.toFixed(1)}
+                          {c.ratingCount > 0 ? ` (${c.ratingCount})` : ''}
                         </span>
                       </p>
                       <DutyBadge partner={c} />
@@ -216,6 +217,7 @@ export default function PartnersPage() {
                             <span className="flex items-center gap-0.5 text-[10px] font-bold text-amber-600">
                               <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
                               {c.rating.toFixed(1)}
+                              {c.ratingCount > 0 ? ` (${c.ratingCount})` : ''}
                             </span>
                           </p>
                           <p className="text-[10px] text-slate-400">

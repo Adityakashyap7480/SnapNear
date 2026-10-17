@@ -15,11 +15,14 @@ interface FareCardProps {
   serviceLabel?: string;
   onBroadcast: () => void;
   submitting: boolean;
+  /** True while a shoot is finding / in progress / unpaid — blocks a second broadcast. */
+  blocked?: boolean;
+  blockedHint?: string;
 }
 
-export default function FareCard({ tier, serviceLabel, onBroadcast, submitting }: FareCardProps) {
+export default function FareCard({ tier, serviceLabel, onBroadcast, submitting, blocked, blockedHint }: FareCardProps) {
   const { platformPct } = useCatalog();
-  const disabled = submitting || !tier;
+  const disabled = submitting || blocked || !tier;
 
   return (
     <View className="rounded-2xl border border-slate-800 bg-brand-navy p-4 sm:p-6" style={shadows.xl}>
@@ -82,11 +85,15 @@ export default function FareCard({ tier, serviceLabel, onBroadcast, submitting }
                 <Radio size={16} color={colors.slate[950]} />
               </Pulse>
             )}
-            <Text className="font-display text-sm font-bold text-slate-950">{submitting ? 'Finding photographers...' : 'Find Nearby Photographer'}</Text>
+            <Text className="font-display text-sm font-bold text-slate-950">
+              {submitting ? 'Finding photographers...' : blocked ? 'Shoot in progress' : 'Find Nearby Photographer'}
+            </Text>
           </Gradient>
         </Pressable>
         <Text className="mt-2.5 text-center text-[11px] text-slate-400">
-          Verified photographers within 10 km get an instant ping. The first to accept comes to you.
+          {blocked
+            ? blockedHint || 'Finish or cancel your current shoot (and pay if due) before booking another.'
+            : 'Verified photographers within 10 km get an instant ping. The first to accept comes to you.'}
         </Text>
       </View>
     </View>

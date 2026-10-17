@@ -128,6 +128,7 @@ const publicProfile = (p: CreatorProfile | null) =>
     isOnline: p.isOnline,
     isVerified: p.isVerified,
     rating: p.rating,
+    ratingCount: p.ratingCount,
     upiId: p.upiId,
     termsVersion: p.termsVersion,
     termsAcceptedAt: p.termsAcceptedAt,

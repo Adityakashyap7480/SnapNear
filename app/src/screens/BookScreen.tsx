@@ -9,42 +9,37 @@ import Gradient from '../components/ui/Gradient';
 import { PageLoader } from '../components/ui/Spinner';
 import Text from '../components/ui/Text';
 import { FadeUp, Pulse } from '../components/ui/motion';
+import CancelBookingModal from '../components/booking/CancelBookingModal';
 import DurationTiles from '../components/booking/DurationTiles';
 import FareCard from '../components/booking/FareCard';
 import LiveStatusCard from '../components/booking/LiveStatusCard';
 import OccasionChips from '../components/booking/OccasionChips';
 import ServicePicker from '../components/booking/ServicePicker';
 import PaymentCelebration, { type Celebration } from '../components/payment/PaymentCelebration';
+import RatingModal, { type RatingPrompt } from '../components/payment/RatingModal';
 import TimeUpAlert from '../components/shoot/TimeUpAlert';
 import { bookingApi } from '../api/services';
+import { CLIENT_CANCEL_REASONS } from '../config/cancelReasons';
 import { BOOKING_STATUS, MATCH_RADIUS_KM, type BookingStatus } from '../config/constants';
 import { getCurrentPlace } from '../lib/location';
-import { BOOKING_EVENTS, SOCKET_EVENTS } from '../config/events';
+import { SOCKET_EVENTS } from '../config/events';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
 import { useScroll } from '../context/ScrollContext';
 import { useSocketEvent } from '../context/SocketContext';
 import useAsync from '../hooks/useAsync';
+import useBookingStatusToasts from '../hooks/useBookingStatusToasts';
+import useLiveReload from '../hooks/useLiveReload';
 import useShootAlerts from '../hooks/useShootAlerts';
 import { openRazorpayCheckout } from '../lib/checkout';
-import { confirmAction } from '../lib/confirm';
 import { playChime } from '../lib/sound';
 import toast from '../lib/toast';
 import type { ApiFailure, Booking, BookingForm, BookingUpdate } from '../types';
 import { colors } from '../theme/colors';
 import { shadows } from '../theme/shadows';
 import { isActive, isPaymentDue, isSearching } from '../utils/bookingStatus';
-import { formatINR, formatMinutes, todayISO } from '../utils/format';
+import { formatINR, todayISO } from '../utils/format';
 import { MESSAGES, isValidPhone } from '../utils/validators';
-
-const EVENT_TOASTS: Record<string, (b: Booking) => string> = {
-  [BOOKING_EVENTS.ACCEPTED]: (b) => `🎉 ${b.creator?.name || 'A photographer'} accepted your shoot!`,
-  [BOOKING_EVENTS.ARRIVED]: (b) =>
-    `📍 ${b.creator?.name || 'Your photographer'} has arrived!${b.startOtp ? ` Share OTP ${b.startOtp} to start your shoot.` : ''}`,
-  [BOOKING_EVENTS.SHOOTING]: (b) => `📸 Your shoot has started! ${formatMinutes(b.durationMinutes || 60)} timer is running.`,
-  [BOOKING_EVENTS.COMPLETED]: (b) => `✅ Shoot completed! Please pay ${formatINR(b.total)} to finish your booking.`,
-  [BOOKING_EVENTS.CANCELLED]: () => 'Booking was cancelled',
-};
 
 const otpToastId = (bookingId: string) => `start-otp-${bookingId}`;
 
@@ -93,10 +88,14 @@ export default function BookScreen() {
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<(Celebration & { key: string }) | null>(null);
+  const [ratingPrompt, setRatingPrompt] = useState<RatingPrompt | null>(null);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
   const celebrated = useRef(new Set<string>());
+  const rated = useRef(new Set<string>());
 
   useEffect(() => {
     if (!form.timeSlot && catalog.timeSlots[0]) setForm((f) => ({ ...f, timeSlot: catalog.timeSlots[0] }));
@@ -120,12 +119,19 @@ export default function BookScreen() {
   const activeBookings = useMemo(() => list.filter((b) => isActive(b.status)), [list]);
   const dueBooking = list.find(isPaymentDue) || null;
   const focused = list.find((b) => b.id === selectedId) || activeBookings[0] || dueBooking || null;
+  const liveTracking = activeBookings.length > 0 || Boolean(dueBooking);
+  const findBlocked = liveTracking;
+  const findBlockedHint = dueBooking
+    ? `Pay ${formatINR(dueBooking.total)} for ${dueBooking.code} before booking another shoot.`
+    : activeBookings.some((b) => isSearching(b.status))
+      ? 'Cancel the current search first to book another shoot.'
+      : 'Finish or cancel your current shoot before booking another.';
 
   // Wait a frame so a just-added or just-changed status card has its final layout
   const scrollToStatus = () => setTimeout(() => scrollIntoView(statusRef), 50);
 
   // The verify response and the socket event both report a payment; celebrate it once.
-  const celebrate = (b: Booking) => {
+  const celebrate = useCallback((b: Booking) => {
     if (celebrated.current.has(b.id)) return;
     celebrated.current.add(b.id);
     setCelebration({
@@ -137,32 +143,52 @@ export default function BookScreen() {
       method: b.payment?.method,
       viewerName: user?.name,
     });
+  }, [user?.name]);
+
+  const closeCelebration = useCallback(() => {
+    setCelebration((prev) => {
+      if (prev && !rated.current.has(prev.key)) {
+        setRatingPrompt({
+          bookingId: prev.key,
+          creatorName: prev.counterpart,
+          bookingCode: prev.code,
+        });
+      }
+      return null;
+    });
+  }, []);
+
+  const submitRating = async (stars: number, remark: string) => {
+    if (!ratingPrompt || ratingSubmitting) return;
+    setRatingSubmitting(true);
+    try {
+      await bookingApi.rate(ratingPrompt.bookingId, { stars, remark });
+      rated.current.add(ratingPrompt.bookingId);
+      setRatingPrompt(null);
+      toast.success('Thanks for your rating!');
+    } catch (err) {
+      toast.error((err as ApiFailure).message || 'Could not submit rating');
+    } finally {
+      setRatingSubmitting(false);
+    }
   };
-  const closeCelebration = useCallback(() => setCelebration(null), []);
   const { alertBooking: timeUpBooking, dismiss: dismissTimeUp } = useShootAlerts(bookings, 'customer');
   const [refreshingOtpId, setRefreshingOtpId] = useState<string | null>(null);
 
-  useSocketEvent<BookingUpdate>(SOCKET_EVENTS.BOOKING_UPDATE, async (payload) => {
-    const fresh = await reload();
-    const b = fresh?.find((x) => x.id === payload.bookingId);
-    if (!b) return;
-
-    if (payload.event === BOOKING_EVENTS.PAID) {
-      celebrate(b);
-      return;
-    }
-    if (payload.event === BOOKING_EVENTS.SHOOTING) toast.dismiss(otpToastId(b.id));
-    const spotlight = ([BOOKING_EVENTS.ARRIVED, BOOKING_EVENTS.SHOOTING, BOOKING_EVENTS.COMPLETED] as string[]).includes(payload.event);
-    if (spotlight) {
-      setSelectedId(b.id);
+  // Socket + poll + resume — keep Finding → Accepted → … → Paid in sync without reopening the app.
+  useLiveReload({ active: liveTracking, reload });
+  useBookingStatusToasts({
+    bookings: list,
+    ready: !loading,
+    onPaid: celebrate,
+    onSpotlight: (bookingId) => {
+      setSelectedId(bookingId);
       setTimeout(() => scrollIntoView(statusRef), 150);
-    }
-    const message = EVENT_TOASTS[payload.event]?.(b);
-    if (message) {
-      playChime(payload.event === BOOKING_EVENTS.ACCEPTED ? 'broadcast' : 'ping');
-      const id = payload.event === BOOKING_EVENTS.ARRIVED ? otpToastId(b.id) : undefined;
-      toast(message, { id, icon: null, duration: spotlight ? 7000 : 4000 });
-    }
+    },
+  });
+
+  useSocketEvent<BookingUpdate>(SOCKET_EVENTS.BOOKING_UPDATE, () => {
+    void reload();
   });
 
   const replace = (updated: Booking) => setBookings((prev) => (prev || []).map((b) => (b.id === updated.id ? updated : b)));
@@ -245,9 +271,9 @@ export default function BookScreen() {
   };
 
   const broadcast = async () => {
-    if (dueBooking) {
-      toast.error(`Please pay ${formatINR(dueBooking.total)} for ${dueBooking.code} before booking a new shoot`);
-      setSelectedId(dueBooking.id);
+    if (findBlocked) {
+      toast.error(findBlockedHint);
+      if (dueBooking || activeBookings[0]) setSelectedId((dueBooking || activeBookings[0]).id);
       scrollToStatus();
       return;
     }
@@ -276,12 +302,15 @@ export default function BookScreen() {
     }
   };
 
-  const cancel = async (booking: Booking) => {
-    if (!(await confirmAction(`Cancel booking ${booking.code}?`))) return;
-    setCancellingId(booking.id);
+  const openCancel = (booking: Booking) => setCancelTarget(booking);
+
+  const confirmCancel = async (reason: string, remark: string) => {
+    if (!cancelTarget) return;
+    setCancellingId(cancelTarget.id);
     try {
-      const { booking: updated } = await bookingApi.cancel(booking.id);
+      const { booking: updated } = await bookingApi.cancel(cancelTarget.id, { reason, remark });
       replace(updated);
+      setCancelTarget(null);
       toast.success('Booking cancelled');
     } catch (err) {
       toast.error((err as ApiFailure).message);
@@ -298,6 +327,25 @@ export default function BookScreen() {
   return (
     <View className="w-full gap-6" style={{ width: '100%' }}>
       {celebration && <PaymentCelebration key={celebration.key} celebration={celebration} onClose={closeCelebration} />}
+      {ratingPrompt && !celebration && (
+        <RatingModal
+          key={ratingPrompt.bookingId}
+          prompt={ratingPrompt}
+          submitting={ratingSubmitting}
+          onSubmit={(stars, remark) => void submitRating(stars, remark)}
+          onSkip={() => setRatingPrompt(null)}
+        />
+      )}
+      {cancelTarget && !celebration && !ratingPrompt && (
+        <CancelBookingModal
+          title={`Cancel ${cancelTarget.code}?`}
+          subtitle="Pick a reason so we can improve matching."
+          reasons={CLIENT_CANCEL_REASONS}
+          submitting={cancellingId === cancelTarget.id}
+          onConfirm={(reason, remark) => void confirmCancel(reason, remark)}
+          onClose={() => setCancelTarget(null)}
+        />
+      )}
       {timeUpBooking && <TimeUpAlert key={timeUpBooking.id} booking={timeUpBooking} role="customer" onDismiss={dismissTimeUp} />}
 
       {dueBooking && (
@@ -466,11 +514,18 @@ export default function BookScreen() {
         </Card>
 
         <View className="min-w-0 gap-4" style={lg ? { flex: 5 } : undefined}>
-          <FareCard tier={tier} serviceLabel={serviceLabel} onBroadcast={broadcast} submitting={submitting} />
+          <FareCard
+            tier={tier}
+            serviceLabel={serviceLabel}
+            onBroadcast={broadcast}
+            submitting={submitting}
+            blocked={findBlocked}
+            blockedHint={findBlockedHint}
+          />
           <LiveStatusCard
             ref={statusRef}
             booking={focused}
-            onCancel={cancel}
+            onCancel={openCancel}
             cancelling={cancellingId === focused?.id}
             onPay={pay}
             paying={payingId === focused?.id}

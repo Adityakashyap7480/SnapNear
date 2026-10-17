@@ -29,7 +29,11 @@ const accountFields = (u: User) => ({
 const LIVE_SHOOTS_LIMIT = 20;
 const OPEN_OR_ACTIVE: BookingStatus[] = [BOOKING_STATUS.SEARCHING, ...ACTIVE_JOB_STATUSES];
 
-const isCompleted = eq(bookings.status, BOOKING_STATUS.COMPLETED);
+/** Paid + completed — matches partner shoot count on the profile. */
+const isCompleted = and(
+  eq(bookings.status, BOOKING_STATUS.COMPLETED),
+  eq(bookings.paymentStatus, PAYMENT_STATUS.PAID)
+);
 
 const daysAgo = (n: number) => {
   const d = new Date();
@@ -243,6 +247,7 @@ export class AdminService {
           experienceYears: c.creatorProfile?.experienceYears || 0,
           gear: c.creatorProfile?.gear || '',
           rating: c.creatorProfile?.rating ?? 5,
+          ratingCount: c.creatorProfile?.ratingCount ?? 0,
           isOnline: Boolean(c.creatorProfile?.isOnline),
           accepted: s?.accepted || 0,
           completed: s?.completed || 0,

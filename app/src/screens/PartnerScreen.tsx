@@ -9,6 +9,7 @@ import Card, { EmptyState } from '../components/ui/Card';
 import { PageLoader } from '../components/ui/Spinner';
 import Text from '../components/ui/Text';
 import { Ripple } from '../components/ui/motion';
+import CancelBookingModal from '../components/booking/CancelBookingModal';
 import ActiveJobCard from '../components/partner/ActiveJobCard';
 import CollectPaymentCard from '../components/partner/CollectPaymentCard';
 import JobHistory from '../components/partner/JobHistory';
@@ -19,6 +20,7 @@ import RequestCard from '../components/partner/RequestCard';
 import PaymentCelebration, { type Celebration } from '../components/payment/PaymentCelebration';
 import TimeUpAlert from '../components/shoot/TimeUpAlert';
 import { creatorApi } from '../api/services';
+import { PARTNER_CANCEL_REASONS } from '../config/cancelReasons';
 import { BOOKING_STATUS } from '../config/constants';
 import { BOOKING_EVENTS, SOCKET_EVENTS } from '../config/events';
 import { ROUTES } from '../config/routes';
@@ -26,6 +28,7 @@ import { useAuth } from '../context/AuthContext';
 import { useScroll } from '../context/ScrollContext';
 import { useSocketEvent } from '../context/SocketContext';
 import useAsync from '../hooks/useAsync';
+import useLiveReload from '../hooks/useLiveReload';
 import useShootAlerts from '../hooks/useShootAlerts';
 import { confirmAction } from '../lib/confirm';
 import { playChime, vibrate } from '../lib/sound';
@@ -47,6 +50,8 @@ export default function PartnerScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const busyLock = useRef<string | null>(null);
   const [qrJob, setQrJob] = useState<Booking | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<(Celebration & { key: string }) | null>(null);
   const celebrated = useRef(new Set<string>());
 
@@ -82,6 +87,10 @@ export default function PartnerScreen() {
 
   const activeJobs = useMemo(() => (data?.activeJob ? [data.activeJob] : []), [data?.activeJob]);
   const { alertBooking: timeUpJob, dismiss: dismissTimeUp } = useShootAlerts(activeJobs, 'partner');
+  const liveTracking = Boolean(
+    data?.profile.creatorProfile.isOnline || data?.activeJob || (data?.awaitingPayment?.length ?? 0) > 0
+  );
+  useLiveReload({ active: liveTracking, reload });
 
   useSocketEvent<FeedUpdate>(SOCKET_EVENTS.FEED_UPDATE, async (payload) => {
     const fresh = await reload();
@@ -212,12 +221,37 @@ export default function PartnerScreen() {
     await advance(job, { confirmEarly: false });
   };
 
+  const confirmPartnerCancel = async (reason: string, remark: string) => {
+    if (!cancelTarget) return;
+    setCancellingId(cancelTarget.id);
+    try {
+      await creatorApi.cancelJob(cancelTarget.id, { reason, remark });
+      setCancelTarget(null);
+      toast.success('Shoot cancelled');
+      await reload();
+    } catch (err) {
+      toast.error((err as ApiFailure).message);
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
   return (
     <View className="gap-6">
       {user?.needsPartnerTerms && <PartnerTermsModal />}
       {!user?.needsPartnerTerms && user?.needsPartnerLocation && <PartnerLocationModal />}
       {celebration && <PaymentCelebration key={celebration.key} celebration={celebration} onClose={closeCelebration} />}
       {qrJob && <PaymentQrModal key={qrJob.id} job={qrJob} onClose={closeQr} onPaid={celebratePayment} />}
+      {cancelTarget && !celebration && !qrJob && (
+        <CancelBookingModal
+          title={`Cancel ${cancelTarget.code}?`}
+          subtitle="You can cancel only before entering the start OTP."
+          reasons={PARTNER_CANCEL_REASONS}
+          submitting={cancellingId === cancelTarget.id}
+          onConfirm={(reason, remark) => void confirmPartnerCancel(reason, remark)}
+          onClose={() => setCancelTarget(null)}
+        />
+      )}
       {timeUpJob && (
         <TimeUpAlert
           key={timeUpJob.id}
@@ -250,7 +284,10 @@ export default function PartnerScreen() {
               <View className="flex-row items-center gap-1">
                 <Star size={14} color={colors.amber[500]} fill={colors.amber[500]} />
                 <Text className="text-xs font-semibold text-amber-600">
-                  {cp.rating.toFixed(1)} ({stats.completed} shoots)
+                  {cp.rating.toFixed(1)}
+                  {cp.ratingCount ? ` · ${cp.ratingCount} rating${cp.ratingCount === 1 ? '' : 's'}` : ''}
+                  {' · '}
+                  {stats.completed} shoots
                 </Text>
               </View>
             </View>
@@ -323,7 +360,16 @@ export default function PartnerScreen() {
 
       {awaitingPayment.length > 0 && <CollectPaymentCard jobs={awaitingPayment} onShowQr={setQrJob} />}
 
-      {activeJob && <ActiveJobCard job={activeJob} onAdvance={advance} onStartShoot={startShoot} busy={busyId === activeJob.id} />}
+      {activeJob && (
+        <ActiveJobCard
+          job={activeJob}
+          onAdvance={advance}
+          onStartShoot={startShoot}
+          onCancel={setCancelTarget}
+          busy={busyId === activeJob.id}
+          cancelling={cancellingId === activeJob.id}
+        />
+      )}
 
       <View className="gap-4">
         <View className="flex-row flex-wrap items-center justify-between gap-2">

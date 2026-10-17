@@ -53,11 +53,17 @@ type BookingRes = { booking: Booking };
 export const bookingApi = {
   create: (data: BookingForm) => request<BookingRes>('POST', '/bookings', { data }),
   mine: () => request<{ bookings: Booking[] }>('GET', '/bookings/mine'),
-  cancel: (id: string) => request<BookingRes>('PATCH', '/bookings/:id/cancel', byId(id)),
+  cancel: (id: string, data: { reason: string; remark?: string }) =>
+    request<BookingRes>('PATCH', '/bookings/:id/cancel', { ...byId(id), data }),
   newStartOtp: (id: string) => request<BookingRes>('POST', '/bookings/:id/start-otp', byId(id)),
   startPayment: (id: string) => request<{ checkout: RazorpayCheckout }>('POST', '/bookings/:id/pay', byId(id)),
   verifyPayment: (id: string, data: RazorpayResult) => request<BookingRes>('POST', '/bookings/:id/pay/verify', { ...byId(id), data }),
   paymentStatus: (id: string) => request<BookingRes>('GET', '/bookings/:id/payment', byId(id)),
+  rate: (id: string, data: { stars: number; remark?: string }) =>
+    request<{ rating: { stars: number; remark: string; bookingId: string } }>('POST', '/bookings/:id/rate', {
+      ...byId(id),
+      data,
+    }),
 };
 
 export const creatorApi = {
@@ -68,6 +74,8 @@ export const creatorApi = {
   decline: (id: string) => request<unknown>('POST', '/creator/requests/:id/decline', byId(id)),
   acceptTerms: () => request<{ user: User }>('POST', '/creator/terms/accept'),
   advance: (id: string) => request<BookingRes>('PATCH', '/creator/jobs/:id/advance', byId(id)),
+  cancelJob: (id: string, data: { reason: string; remark?: string }) =>
+    request<BookingRes>('PATCH', '/creator/jobs/:id/cancel', { ...byId(id), data }),
   startShoot: (id: string, otp: string) => request<BookingRes>('POST', '/creator/jobs/:id/start', { ...byId(id), data: { otp } }),
   collectLink: (id: string) => request<{ link: { linkId: string; url: string } }>('POST', '/creator/jobs/:id/collect', byId(id)),
   paymentStatus: (id: string) => request<BookingRes>('GET', '/creator/jobs/:id/payment', byId(id)),

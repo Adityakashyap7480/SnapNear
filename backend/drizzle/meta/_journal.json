@@ -36,6 +36,20 @@
       "when": 1792500000000,
       "tag": "0004_signup_otp",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792600000000,
+      "tag": "0005_booking_ratings",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792700000000,
+      "tag": "0006_cancel_reasons",
+      "breakpoints": true
     }
   ]
 }

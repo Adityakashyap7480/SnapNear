@@ -6,6 +6,8 @@ export interface CreatorProfile {
   gear: string;
   bio?: string;
   rating: number;
+  /** How many client ratings went into `rating` (0 until first review). */
+  ratingCount?: number;
   isOnline: boolean;
   isVerified?: boolean;
   upiId?: string;

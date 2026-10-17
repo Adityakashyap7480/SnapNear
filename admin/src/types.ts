@@ -153,6 +153,7 @@ export interface AdminPartner extends AccountFields {
   experienceYears: number;
   gear: string;
   rating: number;
+  ratingCount: number;
   isOnline: boolean;
   accepted: number;
   completed: number;

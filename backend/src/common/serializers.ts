@@ -47,6 +47,7 @@ export function serializeBooking(
           experienceYears: creator?.creatorProfile?.experienceYears,
           gear: creator?.creatorProfile?.gear,
           rating: creator?.creatorProfile?.rating,
+          ratingCount: creator?.creatorProfile?.ratingCount,
         }
       : null,
     acceptedAt: b.acceptedAt,
@@ -57,6 +58,8 @@ export function serializeBooking(
     completedAt: b.completedAt,
     cancelledAt: b.cancelledAt,
     cancelledBy: b.cancelledBy,
+    cancelReason: b.cancelReason || undefined,
+    cancelRemark: b.cancelRemark || undefined,
     payment: b.paymentStatus
       ? { status: b.paymentStatus, method: b.paymentMethod || null, via: b.paymentVia || null, paidAt: b.paidAt || null }
       : null,

@@ -77,7 +77,21 @@ export const env = {
   /** Public web app URL used in password-reset emails (Vercel). */
   appPublicUrl: text('APP_PUBLIC_URL', 'https://snap-near.vercel.app').replace(/\/$/, ''),
 
-  /** Optional SMTP for forgot-password emails. Without these, links are logged in development only. */
+  /**
+   * Brevo (HTTPS) on Render — verify your Gmail as sender so From stays your address.
+   * Free hosts often block outbound SMTP (587/465); local can keep using SMTP_*.
+   */
+  brevo: {
+    apiKey: read('BREVO_API_KEY'),
+  },
+
+  /** Optional Resend fallback (needs a verified domain for custom From). */
+  resend: {
+    apiKey: read('RESEND_API_KEY'),
+    from: text('RESEND_FROM', ''),
+  },
+
+  /** Optional SMTP for local/dev. Without any provider, OTPs are logged in development only. */
   smtp: {
     host: read('SMTP_HOST'),
     port: number('SMTP_PORT', 587, { min: 1, max: 65535 }),

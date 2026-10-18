@@ -10,7 +10,7 @@ export const SESSION_PACKAGES = [
     hours: 1,
     minutes: 60,
     label: '1 Hour',
-    photo: { price: 500, subtitle: 'Quick Solo / Insta' },
+    photo: { price: 10, subtitle: 'Quick Solo / Insta' },
     video: { price: 999, subtitle: 'Reels & High-Def Video' },
   },
   {

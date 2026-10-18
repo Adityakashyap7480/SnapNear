@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { DEFAULT_SESSION_PRICES } from '../constants/session-packages.js';
+import { DEV_CLIENT_ORIGINS, PRODUCTION_CLIENT_ORIGINS, SITE } from '../constants/site.js';
 
 dotenv.config({ quiet: true });
 
@@ -69,14 +70,17 @@ export const env = {
     password: required('SUPER_ADMIN_PASSWORD', { trim: false }),
   },
 
-  clientOrigins: text('CLIENT_ORIGIN', 'http://localhost:8081,http://localhost:5173,http://localhost:5175')
+  clientOrigins: text(
+    'CLIENT_ORIGIN',
+    [...DEV_CLIENT_ORIGINS, ...PRODUCTION_CLIENT_ORIGINS].join(',')
+  )
     .split(',')
     .map((o) => o.trim().replace(/\/$/, ''))
     .filter(Boolean),
-  supportEmail: text('SUPPORT_EMAIL', 'supportsnear@gmail.com'),
+  supportEmail: text('SUPPORT_EMAIL', SITE.supportEmail),
 
-  /** Public web app URL used in password-reset emails (Vercel). */
-  appPublicUrl: text('APP_PUBLIC_URL', 'https://snap-near.vercel.app').replace(/\/$/, ''),
+  /** Public web app URL used in password-reset / email links. Override with APP_PUBLIC_URL. */
+  appPublicUrl: text('APP_PUBLIC_URL', SITE.webUrl).replace(/\/$/, ''),
 
   /**
    * Brevo (HTTPS) on Render — verify your Gmail as sender so From stays your address.
@@ -98,7 +102,8 @@ export const env = {
     port: number('SMTP_PORT', 587, { min: 1, max: 65535 }),
     user: read('SMTP_USER'),
     pass: process.env.SMTP_PASS ?? '',
-    from: text('SMTP_FROM', ''),
+    /** Prefer SITE.mailFrom / SMTP_FROM=SnapNear <noreply@snapnear.in> in production. */
+    from: text('SMTP_FROM', SITE.mailFrom),
   },
 
   /** Google OAuth client IDs allowed to mint ID tokens (web / Android / iOS). Comma-separated. */

@@ -1,3 +1,5 @@
+import { SITE } from './site';
+
 const trimSlash = (url = '') => url.replace(/\/$/, '');
 
 export const API_ORIGIN = trimSlash(import.meta.env.VITE_API_URL);
@@ -6,12 +8,12 @@ export const API_TIMEOUT_MS = 15000;
 export const SOCKET_URL = API_ORIGIN || window.location.origin;
 
 /** Customer & partner app (login, signup, /book, /partner). Same domain unless overridden. */
-export const APP_URL = trimSlash(import.meta.env.VITE_APP_URL);
+export const APP_URL = trimSlash(import.meta.env.VITE_APP_URL) || SITE.webUrl;
 
 // Shared with the customer & partner app on the same domain, so one login works everywhere
 export const TOKEN_KEY = 'snapnear.token';
 
-export const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || 'supportsnear@gmail.com';
+export const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL || SITE.supportEmail;
 
 export const ROLES = {
   CLIENT: 'client',

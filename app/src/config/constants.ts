@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { isRunningInExpoGo } from 'expo';
 import { ROUTES } from './routes';
+import { SITE } from './site';
 
 const trimSlash = (url = '') => url.replace(/\/$/, '');
 const isWeb = Platform.OS === 'web';
@@ -44,14 +45,15 @@ export const SOCKET_URL =
   (localWebHost ? trimSlash(process.env.EXPO_DEV_BACKEND || 'http://localhost:5000') : isWeb ? window.location.origin : '');
 
 /** Public website, used by the phone app to open the owner panel in the browser. */
-export const WEB_URL = trimSlash(process.env.EXPO_PUBLIC_WEB_URL) || (isWeb ? window.location.origin : '');
+export const WEB_URL =
+  trimSlash(process.env.EXPO_PUBLIC_WEB_URL) || (isWeb ? window.location.origin : SITE.webUrl);
 /** Owner panel (the admin app), served at /admin on the same domain unless overridden. */
 export const ADMIN_URL = trimSlash(process.env.EXPO_PUBLIC_ADMIN_URL) || `${WEB_URL}/admin`;
 
 // Shared with the admin app on the same domain, so one login works everywhere
 export const TOKEN_KEY = 'snapnear.token';
 
-export const SUPPORT_EMAIL = process.env.EXPO_PUBLIC_SUPPORT_EMAIL || 'supportsnear@gmail.com';
+export const SUPPORT_EMAIL = process.env.EXPO_PUBLIC_SUPPORT_EMAIL || SITE.supportEmail;
 
 /** Partners only see (and get pushed) customer shoots within this radius. */
 export const MATCH_RADIUS_KM = Number(process.env.EXPO_PUBLIC_MATCH_RADIUS_KM) || 10;

@@ -202,8 +202,8 @@ export const bookings = pgTable(
     index('bookings_creator_idx').on(t.creatorId, t.status),
     index('bookings_payment_idx').on(t.paymentStatus, t.settlementStatus),
     index('bookings_order_idx').on(t.paymentOrderId),
-    // A partner can only work one shoot at a time
-    uniqueIndex('bookings_one_active_job_per_creator')
+    // Active jobs per partner (overlap is enforced in acceptRequest by time slot)
+    index('bookings_creator_active_idx')
       .on(t.creatorId)
       .where(sql`${t.status} in (${sql.raw(ACTIVE_JOB_STATUSES.map((s) => `'${s}'`).join(', '))})`),
   ]

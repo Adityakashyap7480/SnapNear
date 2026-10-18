@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { DEFAULT_SESSION_PRICES } from '../constants/session-packages.js';
 
 dotenv.config({ quiet: true });
 
@@ -117,18 +118,19 @@ export const env = {
   },
 
   platformFeePercent: number('PLATFORM_FEE_PERCENT', 20, { max: 100, integer: false }),
+  /** Defaults from constants/session-packages.ts; optional PRICE_* env overrides. */
   prices: {
     photo: {
-      '1hr': price('PRICE_PHOTO_1HR', 500),
-      '2hr': price('PRICE_PHOTO_2HR', 900),
-      '4hr': price('PRICE_PHOTO_4HR', 1600),
-      '1day': price('PRICE_PHOTO_1DAY', 3000),
+      '1hr': price('PRICE_PHOTO_1HR', DEFAULT_SESSION_PRICES.photo['1hr']),
+      '2hr': price('PRICE_PHOTO_2HR', DEFAULT_SESSION_PRICES.photo['2hr']),
+      '4hr': price('PRICE_PHOTO_4HR', DEFAULT_SESSION_PRICES.photo['4hr']),
+      '1day': price('PRICE_PHOTO_1DAY', DEFAULT_SESSION_PRICES.photo['1day']),
     },
     video: {
-      '1hr': price('PRICE_VIDEO_1HR', 999),
-      '2hr': price('PRICE_VIDEO_2HR', 1500),
-      '4hr': price('PRICE_VIDEO_4HR', 2500),
-      '1day': price('PRICE_VIDEO_1DAY', 5000),
+      '1hr': price('PRICE_VIDEO_1HR', DEFAULT_SESSION_PRICES.video['1hr']),
+      '2hr': price('PRICE_VIDEO_2HR', DEFAULT_SESSION_PRICES.video['2hr']),
+      '4hr': price('PRICE_VIDEO_4HR', DEFAULT_SESSION_PRICES.video['4hr']),
+      '1day': price('PRICE_VIDEO_1DAY', DEFAULT_SESSION_PRICES.video['1day']),
     },
   },
   payoutHoldDays: number('PAYOUT_HOLD_DAYS', 7),

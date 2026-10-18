@@ -24,7 +24,7 @@ export default function RequestCard({ request, onAccept, onDecline, busy, disabl
   const sm = width >= 640;
   const md = width >= 768;
   const isVideo = request.serviceType === 'video';
-  const blocked = Boolean(disabledReason) || busy;
+  const acceptBlocked = Boolean(disabledReason);
 
   return (
     <View className="overflow-hidden rounded-2xl border-2 border-brand-orange/40" style={shadows.lg}>
@@ -95,7 +95,7 @@ export default function RequestCard({ request, onAccept, onDecline, busy, disabl
                 variant="outline"
                 size="md"
                 onPress={() => onDecline(request)}
-                disabled={blocked}
+                disabled={busy}
                 icon={X}
               >
                 Skip
@@ -107,17 +107,20 @@ export default function RequestCard({ request, onAccept, onDecline, busy, disabl
                 size="md"
                 className="flex-1"
                 onPress={() => {
-                  if (blocked) return;
+                  if (acceptBlocked || busy) return;
                   onAccept(request);
                 }}
                 loading={busy}
-                disabled={Boolean(disabledReason)}
+                disabled={acceptBlocked}
                 icon={Check}
                 iconSize={16}
               >
                 Accept Shoot
               </Button>
             </View>
+            {disabledReason ? (
+              <Text className="mt-2 text-center text-xs font-medium leading-4 text-amber-700">{disabledReason}</Text>
+            ) : null}
           </View>
         </View>
       </Gradient>

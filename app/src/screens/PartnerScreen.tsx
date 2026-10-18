@@ -85,10 +85,15 @@ export default function PartnerScreen() {
   const closeQr = useCallback(() => setQrJob(null), []);
   const closeCelebration = useCallback(() => setCelebration(null), []);
 
-  const activeJobs = useMemo(() => (data?.activeJob ? [data.activeJob] : []), [data?.activeJob]);
+  const activeJobs = useMemo(
+    () => data?.activeJobs ?? (data?.activeJob ? [data.activeJob] : []),
+    [data?.activeJobs, data?.activeJob]
+  );
   const { alertBooking: timeUpJob, dismiss: dismissTimeUp } = useShootAlerts(activeJobs, 'partner');
   const liveTracking = Boolean(
-    data?.profile.creatorProfile.isOnline || data?.activeJob || (data?.awaitingPayment?.length ?? 0) > 0
+    data?.profile.creatorProfile.isOnline ||
+      activeJobs.length > 0 ||
+      (data?.awaitingPayment?.length ?? 0) > 0
   );
   useLiveReload({ active: liveTracking, reload });
 
@@ -125,15 +130,11 @@ export default function PartnerScreen() {
   if (loading) return <PageLoader label="Loading SnapNear Partner..." />;
   if (error || !data) return <Text className="py-20 text-center text-sm text-red-600">{error}</Text>;
 
-  const { profile, requests, activeJob, awaitingPayment, history, stats, wallet } = data;
+  const { profile, requests, awaitingPayment, history, stats, wallet } = data;
   const cp = profile.creatorProfile;
   const online = cp.isOnline;
   const hasUpi = Boolean(wallet.upiId?.trim());
-  const acceptBlockedReason = !hasUpi
-    ? 'Add your UPI ID in My Wallet first'
-    : activeJob
-      ? 'Finish your current shoot first'
-      : undefined;
+  const upiBlockedReason = !hasUpi ? 'Add your UPI ID in My Wallet first' : undefined;
 
   const toggleDuty = async () => {
     setTogglingDuty(true);
@@ -152,6 +153,10 @@ export default function PartnerScreen() {
     if (!hasUpi) {
       toast.error('Add your UPI ID in My Wallet before accepting shoots');
       router.push(ROUTES.PROFILE_WALLET);
+      return;
+    }
+    if (req.acceptBlockedReason) {
+      toast.error(req.acceptBlockedReason);
       return;
     }
     // Ref lock so the first tap always wins (React busy state updates one frame later).
@@ -360,16 +365,17 @@ export default function PartnerScreen() {
 
       {awaitingPayment.length > 0 && <CollectPaymentCard jobs={awaitingPayment} onShowQr={setQrJob} />}
 
-      {activeJob && (
+      {activeJobs.map((job) => (
         <ActiveJobCard
-          job={activeJob}
+          key={job.id}
+          job={job}
           onAdvance={advance}
           onStartShoot={startShoot}
           onCancel={setCancelTarget}
-          busy={busyId === activeJob.id}
-          cancelling={cancellingId === activeJob.id}
+          busy={busyId === job.id}
+          cancelling={cancellingId === job.id}
         />
-      )}
+      ))}
 
       <View className="gap-4">
         <View className="flex-row flex-wrap items-center justify-between gap-2">
@@ -417,7 +423,7 @@ export default function PartnerScreen() {
                 onAccept={accept}
                 onDecline={decline}
                 busy={busyId === r.id}
-                disabledReason={acceptBlockedReason}
+                disabledReason={upiBlockedReason || r.acceptBlockedReason || undefined}
               />
             ))}
           </View>

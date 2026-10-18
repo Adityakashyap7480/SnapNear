@@ -1,5 +1,10 @@
 import { env } from '../config/env.js';
 import type { ServiceType } from './roles.js';
+import {
+  DEFAULT_DURATION_MINUTES,
+  SESSION_PACKAGES,
+  type SessionPackageId,
+} from './session-packages.js';
 
 export const PLATFORM_SHARE = env.platformFeePercent / 100;
 export const CREATOR_SHARE = (100 - env.platformFeePercent) / 100;
@@ -9,7 +14,7 @@ export const SERVICE_LABELS: Record<ServiceType, { id: ServiceType; label: strin
   video: { id: 'video', label: 'Video & Cinema' },
 };
 
-type DurationId = '1hr' | '2hr' | '4hr' | '1day';
+export type DurationId = SessionPackageId;
 
 export interface PricingTier {
   id: DurationId;
@@ -18,16 +23,13 @@ export interface PricingTier {
   total: number;
 }
 
-// Testing only: SHOOT_TEST_MINUTES turns this package into an N-minute shoot (label, timer and all)
+// Testing only: SHOOT_TEST_MINUTES turns the 1 Hour package into an N-minute shoot
 const TEST_TIER_ID: DurationId = '1hr';
 const testMinutes = env.shootTestMinutes;
 
-// Shoot length per package; the on-site timer counts down from this once the shoot starts
+/** Shoot length per package; on-site timer counts down from this once the shoot starts. */
 export const DURATION_MINUTES: Record<string, number> = {
-  '1hr': 60,
-  '2hr': 120,
-  '4hr': 240,
-  '1day': 480,
+  ...DEFAULT_DURATION_MINUTES,
   ...(testMinutes ? { [TEST_TIER_ID]: testMinutes } : {}),
 };
 
@@ -38,19 +40,20 @@ const withTestMode = (tier: PricingTier): PricingTier =>
 
 const { photo, video } = env.prices;
 
+/** Built from SESSION_PACKAGES + live prices (env override or package defaults). */
 const BASE_PRICING_TIERS: Record<ServiceType, PricingTier[]> = {
-  photo: [
-    { id: '1hr', label: '1 Hour', subtitle: 'Quick Solo / Insta', total: photo['1hr'] },
-    { id: '2hr', label: '2 Hours', subtitle: 'Birthdays / Family', total: photo['2hr'] },
-    { id: '4hr', label: '4 Hours', subtitle: 'Half Day Party', total: photo['4hr'] },
-    { id: '1day', label: '1 Day', subtitle: 'Full Day Coverage (8 hrs)', total: photo['1day'] },
-  ],
-  video: [
-    { id: '1hr', label: '1 Hour', subtitle: 'Reels & High-Def Video', total: video['1hr'] },
-    { id: '2hr', label: '2 Hours', subtitle: 'Cinematic Coverage', total: video['2hr'] },
-    { id: '4hr', label: '4 Hours', subtitle: 'Half Day Cinema', total: video['4hr'] },
-    { id: '1day', label: '1 Day', subtitle: 'Full Day Cinematography (8 hrs)', total: video['1day'] },
-  ],
+  photo: SESSION_PACKAGES.map((p) => ({
+    id: p.id,
+    label: p.label,
+    subtitle: p.photo.subtitle,
+    total: photo[p.id],
+  })),
+  video: SESSION_PACKAGES.map((p) => ({
+    id: p.id,
+    label: p.label,
+    subtitle: p.video.subtitle,
+    total: video[p.id],
+  })),
 };
 
 export const PRICING_TIERS = Object.fromEntries(

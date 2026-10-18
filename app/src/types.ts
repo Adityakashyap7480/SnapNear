@@ -123,6 +123,8 @@ export interface Booking {
   completedAt: string | null;
   payment: Payment | null;
   createdAt: string;
+  /** Set on partner feed when this request overlaps an already-accepted time slot. */
+  acceptBlockedReason?: string | null;
 }
 
 export interface BookingForm {
@@ -188,6 +190,8 @@ export interface CreatorStats {
 export interface CreatorDashboard {
   profile: User & { creatorProfile: CreatorProfile };
   requests: Booking[];
+  /** All assigned / arrived / shooting jobs (non-overlapping slots allowed). */
+  activeJobs?: Booking[];
   activeJob: Booking | null;
   awaitingPayment: Booking[];
   history: Booking[];

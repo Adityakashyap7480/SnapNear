@@ -23,6 +23,7 @@ import { PaymentsService, isPaymentDue } from '../payments/payments.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { BookingsRepository } from '../repositories/bookings.repository.js';
 import { withinRadiusKm } from '../common/geo.js';
+import { TIME_SLOT_CONFLICT_MESSAGE, findConflictingJob } from '../common/time-slot.js';
 import {
   type User,
   UsersRepository,
@@ -157,6 +158,18 @@ export class CreatorService {
       .slice(0, limit);
   }
 
+  private async activeJobsFor(creatorId: string) {
+    const rows = await this.db
+      .select()
+      .from(bookings)
+      .where(and(eq(bookings.creatorId, creatorId), inArray(bookings.status, ACTIVE_JOB_STATUSES)))
+      .orderBy(bookings.shootDate, desc(bookings.acceptedAt));
+    // Prefer in-progress shoots first so the partner UI focuses on what needs action now
+    const rank = (s: string) =>
+      s === BOOKING_STATUS.SHOOTING ? 0 : s === BOOKING_STATUS.ARRIVED ? 1 : 2;
+    return rows.sort((a, b) => rank(a.status) - rank(b.status) || a.shootDate.localeCompare(b.shootDate));
+  }
+
   async dashboard(current: AppUser) {
     const creator = current.doc;
     const isOnline = Boolean(creator.creatorProfile?.isOnline);
@@ -172,14 +185,9 @@ export class CreatorService {
       isPaymentDue
     );
 
-    const [requests, [activeJob], history, stats, wallet] = await Promise.all([
+    const [requests, activeJobs, history, stats, wallet] = await Promise.all([
       isOnline ? this.nearbyOpenRequests(creator, 20) : Promise.resolve([]),
-      this.db
-        .select()
-        .from(bookings)
-        .where(and(mine, inArray(bookings.status, ACTIVE_JOB_STATUSES)))
-        .orderBy(desc(bookings.acceptedAt))
-        .limit(1),
+      this.activeJobsFor(creator.id),
       this.db
         .select()
         .from(bookings)
@@ -193,8 +201,15 @@ export class CreatorService {
     return {
       success: true,
       profile: toPublicUser(creator),
-      requests: requests.map((b) => serializeBooking(b, { hideClientContact: true })),
-      activeJob: activeJob ? serializeBooking(activeJob) : null,
+      requests: requests.map((b) => {
+        const conflict = findConflictingJob(b, activeJobs);
+        return {
+          ...serializeBooking(b, { hideClientContact: true }),
+          acceptBlockedReason: conflict ? TIME_SLOT_CONFLICT_MESSAGE : null,
+        };
+      }),
+      activeJobs: activeJobs.map((b) => serializeBooking(b)),
+      activeJob: activeJobs[0] ? serializeBooking(activeJobs[0]) : null,
       awaitingPayment: awaitingPayment.map((b) => serializeBooking(b)),
       history: history.map((b) => serializeBooking(b)),
       stats,
@@ -242,13 +257,6 @@ export class CreatorService {
       throw ApiError.badRequest('Go online to accept shoot requests');
     }
 
-    const activeJob = await this.bookings.find(
-      and(eq(bookings.creatorId, creator.id), inArray(bookings.status, ACTIVE_JOB_STATUSES))
-    );
-    if (activeJob) {
-      throw ApiError.conflict('Finish your current shoot before accepting a new one');
-    }
-
     const candidate = await this.bookings.find(and(eq(bookings.id, id), this.openRequests(creator)));
     if (!candidate) throw ApiError.notFound('This shoot is no longer available');
     if (
@@ -259,6 +267,14 @@ export class CreatorService {
       )
     ) {
       throw ApiError.forbidden(`This shoot is outside your ${env.matchRadiusKm} km range`);
+    }
+
+    const activeJobs = await this.activeJobsFor(creator.id);
+    if (findConflictingJob(candidate, activeJobs)) {
+      throw ApiError.conflict(TIME_SLOT_CONFLICT_MESSAGE);
+    }
+    if (env.maxActiveBookings > 0 && activeJobs.length >= env.maxActiveBookings) {
+      throw ApiError.conflict('You already have the maximum number of active shoots. Finish one before accepting another.');
     }
 
     const booking = await this.bookings.update(and(eq(bookings.id, id), this.openRequests(creator)), {

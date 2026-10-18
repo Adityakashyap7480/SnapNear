@@ -13,7 +13,8 @@ type ErrorLike = Error & {
 
 const DUPLICATE_MESSAGES: Record<string, string> = {
   users_email_unique: 'An account with this email already exists',
-  bookings_one_active_job_per_creator: 'Finish your current shoot before accepting a new one',
+  bookings_one_active_job_per_creator:
+    "You're already booked in this time slot, so you can't accept this shoot.",
 };
 
 /** Every error leaves the API as `{ success: false, message, details?, ...extra }`. */

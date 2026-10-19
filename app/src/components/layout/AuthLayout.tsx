@@ -13,7 +13,7 @@ import { formatINR } from '../../utils/format';
 const isWeb = Platform.OS === 'web';
 
 /** Marketing-only (login has no catalog yet). Keep in sync with backend `session-packages.ts` photo 1hr. */
-const DEMO = { photoFrom: 10 };
+const DEMO = { photoFrom: 5 };
 
 const SHOOT_SHOTS = [
   { src: require('../../../assets/occasions/family.jpg'), label: 'Family' },

@@ -29,7 +29,7 @@ function useTerms(): { icon: LucideIcon; title: string; body: string }[] {
     {
       icon: Wallet,
       title: 'Payments only through SnapNear',
-      body: 'Customers always pay inside the SnapNear app (UPI, card or the payment QR). Never ask for or accept cash or direct UPI from a SnapNear customer. Your earnings reach your wallet and are paid to your UPI ID after the payout hold period.',
+      body: 'Customers always pay inside the SnapNear app (UPI, card or the payment QR). Never ask for or accept cash or direct UPI from a SnapNear customer. Your earnings are tracked in SnapNear and paid to your UPI ID after the payout hold period.',
     },
     {
       icon: Handshake,

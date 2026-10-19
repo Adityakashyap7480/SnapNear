@@ -107,7 +107,7 @@ export default function WalletCard({ wallet, onChanged }: { wallet: Wallet; onCh
         <View className="flex-row flex-wrap items-start justify-between gap-2">
           <View className="flex-row items-center gap-1.5">
             <WalletIcon size={14} color={colors.amber[300]} />
-            <Text className="text-[11px] font-bold uppercase tracking-wider text-amber-300">SnapNear Wallet</Text>
+            <Text className="text-[11px] font-bold uppercase tracking-wider text-amber-300">Payout balance</Text>
           </View>
           {wallet.nextPayoutAt && (
             <View className="flex-row items-center gap-1 rounded-full bg-white/10 px-2.5 py-1">

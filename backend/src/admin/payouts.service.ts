@@ -120,7 +120,7 @@ export class PayoutsService {
     };
   }
 
-  /** Records that the owner has sent a partner their pending earnings by UPI, emptying the partner's wallet. */
+  /** Records that the owner has sent a partner their pending earnings by UPI, clearing their payout balance. */
   async markPaid({ creatorId, reference, note }: MarkPayoutInput) {
     const [creator] = await this.users.listWithProfiles(
       and(eq(users.id, creatorId), eq(users.role, ROLES.CREATOR)),

@@ -38,7 +38,7 @@ function UpiLine({ partner }: { partner: PendingPayout }) {
     return (
       <p className="flex items-start gap-1.5 rounded-lg bg-red-50 p-2 text-[11px] text-red-700">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>UPI ID not added. Ask {partner.name.split(' ')[0]} to add it in their wallet, or pay to {partner.phone}.</span>
+        <span>UPI ID not added. Ask {partner.name.split(' ')[0]} to add it under Earnings & Payouts, or pay to {partner.phone}.</span>
       </p>
     );
   }
@@ -94,7 +94,7 @@ function MarkPaidModal({ partner, holdDays, onClose, onDone }: MarkPaidModalProp
       open
       onClose={onClose}
       title={`Pay ${partner.name}`}
-      description="Send this amount from your UPI app first, then record it here. The partner's wallet goes to ₹0 and they get notified."
+      description="Send this amount from your UPI app first, then record it here. The partner's payout balance goes to ₹0 and they get notified."
       icon={Banknote}
       iconClass="bg-emerald-100 text-emerald-700"
       footer={
@@ -197,7 +197,7 @@ export default function PayoutsPage() {
           icon={Wallet}
           label="Owed to Partners"
           value={formatINR(s.owedToPartners, { fixed: true })}
-          hint={`${s.owedCount} paid shoot(s) in wallets`}
+          hint={`${s.owedCount} paid shoot(s) awaiting payout`}
         />
         <StatCard
           tone="emerald"
@@ -224,7 +224,7 @@ export default function PayoutsPage() {
       <Card className="p-4 sm:p-6">
         <div className="mb-4">
           <h3 className="font-display text-base font-bold text-slate-900">Pending payouts</h3>
-          <p className="text-xs text-slate-500">Send the amount by UPI, then tap Mark as Paid. The partner&apos;s wallet resets to ₹0.</p>
+          <p className="text-xs text-slate-500">Send the amount by UPI, then tap Mark as Paid. The partner&apos;s payout balance resets to ₹0.</p>
         </div>
 
         {partners.length === 0 ? (
@@ -252,7 +252,7 @@ export default function PayoutsPage() {
 
                 <div className="mt-3 flex items-end justify-between gap-2">
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase">Wallet balance</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase">Payout balance</p>
                     <p className="font-display text-2xl font-black text-slate-900">{formatINR(p.amount, { fixed: true })}</p>
                   </div>
                   <p className="text-right text-[10px] text-slate-500">

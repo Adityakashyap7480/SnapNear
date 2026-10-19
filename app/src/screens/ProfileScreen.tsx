@@ -77,7 +77,7 @@ export default function ProfileScreen() {
         />
         <Tile
           icon={Wallet}
-          title="My Wallet"
+          title="Earnings & Payouts"
           subtitle={isPartner ? `Your ${partnerPct} payouts` : 'Payments & dues'}
           onPress={() => router.push(ROUTES.PROFILE_WALLET)}
         />

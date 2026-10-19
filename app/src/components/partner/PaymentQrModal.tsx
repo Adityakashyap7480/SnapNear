@@ -151,7 +151,7 @@ export default function PaymentQrModal({ job, onClose, onPaid }: PaymentQrModalP
           </View>
 
           <Text className="mt-3 text-center text-[10px] leading-4 text-slate-400">
-            Payment goes securely to SnapNear. Your {partnerPct} ({formatINR(job.creatorPayout, { fixed: true })}) is added to your wallet instantly.
+            Payment goes securely to SnapNear. Your {partnerPct} ({formatINR(job.creatorPayout, { fixed: true })}) is added to your payout balance instantly.
           </Text>
         </View>
       )}

@@ -147,7 +147,7 @@ export const env = {
     maxAttempts: number('START_OTP_MAX_ATTEMPTS', 5, { min: 1 }),
   },
   // Bump when the partner terms text changes: every partner must accept the new version again
-  partnerTermsVersion: text('PARTNER_TERMS_VERSION', '2026-10-15'),
+  partnerTermsVersion: text('PARTNER_TERMS_VERSION', '2026-10-19'),
   // Testing only: turns the 1 Hour package into an N-minute shoot. Leave unset in real use.
   shootTestMinutes: number('SHOOT_TEST_MINUTES', 0),
 };

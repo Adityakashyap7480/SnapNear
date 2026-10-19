@@ -10,5 +10,6 @@ export const ROUTES = Object.freeze({
   OWNER: '/owner',
   PROFILE: '/profile',
   PROFILE_BOOKINGS: '/profile/bookings',
-  PROFILE_WALLET: '/profile/wallet',
+  /** Partner earnings & UPI payout settings (avoid the word "wallet" in the public URL). */
+  PROFILE_WALLET: '/profile/earnings',
 } as const);

@@ -81,7 +81,7 @@ export class CreatorService {
     return row;
   }
 
-  /** The partner's SnapNear wallet: paid shoots waiting for the manual UPI payout, and what's already been sent. */
+  /** Partner earnings balance: paid shoots waiting for manual UPI payout, and what's already been sent. */
   private async computeWallet(creator: User) {
     const isDue = eq(bookings.paymentStatus, PAYMENT_STATUS.DUE);
     const isUnsettled = and(
@@ -251,7 +251,7 @@ export class CreatorService {
     if (needsPartnerTerms(creator)) throw ApiError.forbidden(TERMS_REQUIRED_MESSAGE);
     if (needsPartnerLocation(creator)) throw ApiError.forbidden('Share your current location before accepting shoots');
     if (!creator.creatorProfile?.upiId?.trim()) {
-      throw ApiError.forbidden('Add your UPI ID in My Wallet before you can accept shoots');
+      throw ApiError.forbidden('Add your UPI ID under Earnings & Payouts before you can accept shoots');
     }
     if (!creator.creatorProfile?.isOnline) {
       throw ApiError.badRequest('Go online to accept shoot requests');

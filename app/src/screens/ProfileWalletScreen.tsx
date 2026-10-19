@@ -31,7 +31,7 @@ export default function ProfileWalletScreen() {
     [isPartner]
   );
 
-  if (loading) return <PageLoader label="Loading wallet..." />;
+  if (loading) return <PageLoader label="Loading earnings..." />;
   if (error || !data) return <Text className="px-4 py-10 text-center text-sm text-red-600">{error || 'Unable to load'}</Text>;
 
   if (data.kind === 'partner') {

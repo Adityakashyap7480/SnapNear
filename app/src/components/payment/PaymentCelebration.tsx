@@ -27,7 +27,7 @@ export interface Celebration {
   amount: number;
   code: string;
   method?: string | null;
-  /** Partner: their share credited to the wallet */
+  /** Partner: their share credited to earnings / payout balance */
   credited?: number;
   holdDays?: number;
   /** The other party's name */
@@ -59,8 +59,8 @@ function copyFor(c: Celebration, partnerPct: string) {
       eyebrow: 'Ka-ching! 💸',
       title: 'Payment Received!',
       amountLabel: `${first(c.counterpart) || 'Customer'} paid`,
-      message: `${formatINR(c.credited, { fixed: true })} (your ${partnerPct}) has been added to your SnapNear wallet. It will be sent to your UPI within ${c.holdDays || 7} days.`,
-      chip: { icon: Wallet as LucideIcon, text: `+${formatINR(c.credited, { fixed: true })} added to your wallet`, box: 'bg-emerald-50', text_: 'text-emerald-700', color: colors.emerald[700] },
+      message: `${formatINR(c.credited, { fixed: true })} (your ${partnerPct}) has been added to your payout balance. It will be sent to your UPI within ${c.holdDays || 7} days.`,
+      chip: { icon: Wallet as LucideIcon, text: `+${formatINR(c.credited, { fixed: true })} added to your balance`, box: 'bg-emerald-50', text_: 'text-emerald-700', color: colors.emerald[700] },
     };
   }
   return {

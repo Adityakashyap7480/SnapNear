@@ -38,7 +38,7 @@ export default function CollectPaymentCard({ jobs, onShowQr }: { jobs: Booking[]
                 {j.code} • {j.occasion} • completed {timeAgo(j.completedAt)}
               </Text>
               <Text className="text-[11px] font-semibold text-emerald-700">
-                Your {partnerPct}: {formatINR(j.creatorPayout, { fixed: true })} goes to your wallet once paid
+                Your {partnerPct}: {formatINR(j.creatorPayout, { fixed: true })} goes to your payout balance once paid
               </Text>
             </View>
             <Button testID={`show-qr-${j.code}`} onPress={() => onShowQr(j)} icon={QrCode} className="shrink-0">
@@ -49,7 +49,7 @@ export default function CollectPaymentCard({ jobs, onShowQr }: { jobs: Booking[]
       </View>
 
       <Text className="text-[11px] leading-[18px] text-slate-600">
-        The customer also sees a &quot;Pay&quot; button in their app. Please don&apos;t accept cash; only SnapNear payments reach your wallet.
+        The customer also sees a &quot;Pay&quot; button in their app. Please don&apos;t accept cash; only SnapNear payments reach your payout balance.
       </Text>
     </Gradient>
   );

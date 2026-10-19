@@ -55,7 +55,7 @@ export default function PartnerScreen() {
   const [celebration, setCelebration] = useState<(Celebration & { key: string }) | null>(null);
   const celebrated = useRef(new Set<string>());
 
-  // After saving UPI in My Wallet, hide the warning as soon as partner returns here.
+  // After saving UPI under Earnings & Payouts, hide the warning as soon as partner returns here.
   useFocusEffect(
     useCallback(() => {
       void reload();
@@ -134,7 +134,7 @@ export default function PartnerScreen() {
   const cp = profile.creatorProfile;
   const online = cp.isOnline;
   const hasUpi = Boolean(wallet.upiId?.trim());
-  const upiBlockedReason = !hasUpi ? 'Add your UPI ID in My Wallet first' : undefined;
+  const upiBlockedReason = !hasUpi ? 'Add your UPI ID under Earnings & Payouts first' : undefined;
 
   const toggleDuty = async () => {
     setTogglingDuty(true);
@@ -151,7 +151,7 @@ export default function PartnerScreen() {
 
   const accept = async (req: Booking) => {
     if (!hasUpi) {
-      toast.error('Add your UPI ID in My Wallet before accepting shoots');
+      toast.error('Add your UPI ID under Earnings & Payouts before accepting shoots');
       router.push(ROUTES.PROFILE_WALLET);
       return;
     }
@@ -346,8 +346,8 @@ export default function PartnerScreen() {
             <View className="min-w-0 flex-1 gap-2">
               <Text className="font-display text-sm font-bold text-red-700">Add your UPI ID to accept shoots</Text>
               <Text className="text-xs font-semibold leading-5 text-red-600">
-                Go to My Wallet and save your UPI ID for payouts first. You cannot accept a shoot until this is done.
-                You can update it anytime from Profile → My Wallet.
+                Go to Earnings & Payouts and save your UPI ID first. You cannot accept a shoot until this is done.
+                You can update it anytime from Profile → Earnings & Payouts.
               </Text>
               <Button
                 size="sm"
@@ -356,7 +356,7 @@ export default function PartnerScreen() {
                 className="self-start"
                 onPress={() => router.push(ROUTES.PROFILE_WALLET)}
               >
-                Open My Wallet
+                Open Earnings & Payouts
               </Button>
             </View>
           </View>

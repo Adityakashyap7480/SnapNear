@@ -57,6 +57,13 @@
       "when": 1792800000000,
       "tag": "0007_slot_overlap",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792900000000,
+      "tag": "0008_payment_upi_qr",
+      "breakpoints": true
     }
   ]
 }

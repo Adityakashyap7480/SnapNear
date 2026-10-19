@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Image, Pressable, View, useWindowDimensions } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { Copy, MessageCircle, QrCode, RefreshCw } from 'lucide-react-native';
 import Button from '../ui/Button';
@@ -19,6 +19,8 @@ import { formatINR } from '../../utils/format';
 
 const POLL_MS = 4000;
 
+type CollectLink = { url: string; upi?: string; qrImageUrl?: string };
+
 interface PaymentQrModalProps {
   job: Booking;
   onClose: () => void;
@@ -26,17 +28,18 @@ interface PaymentQrModalProps {
 }
 
 /**
- * Shows the SnapNear (Razorpay) payment page for a completed job as a QR code and
- * keeps checking until the customer pays.
+ * Partner collect QR: prefers native UPI payload (PhonePe/GPay pay screen),
+ * falls back to Razorpay's QR image, then to the payment-link URL.
  */
 export default function PaymentQrModal({ job, onClose, onPaid }: PaymentQrModalProps) {
   const { partnerPct } = useCatalog();
   const { width } = useWindowDimensions();
-  const [link, setLink] = useState<{ linkId: string; url: string } | null>(null);
+  const [link, setLink] = useState<CollectLink | null>(null);
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const firstName = job.client.name?.split(' ')[0] || 'the customer';
+  const qrSize = width >= 400 ? 220 : 200;
 
   useEffect(() => {
     let cancelled = false;
@@ -117,11 +120,17 @@ export default function PaymentQrModal({ job, onClose, onPaid }: PaymentQrModalP
       ) : (
         <View className="items-center">
           <View testID="payment-qr" className="rounded-2xl border-4 border-slate-900 bg-white p-3" style={shadows.lg}>
-            <QRCode value={link.url} size={width >= 400 ? 220 : 200} ecl="M" quietZone={4} />
+            {link.upi ? (
+              <QRCode value={link.upi} size={qrSize} ecl="M" quietZone={4} />
+            ) : link.qrImageUrl ? (
+              <Image source={{ uri: link.qrImageUrl }} style={{ width: qrSize, height: qrSize }} resizeMode="contain" />
+            ) : (
+              <QRCode value={link.url} size={qrSize} ecl="M" quietZone={4} />
+            )}
           </View>
           <Text className="mt-3 font-display text-3xl font-black text-slate-900">{formatINR(job.total)}</Text>
           <Text className="mt-1 max-w-xs text-center text-xs leading-5 text-slate-500">
-            Ask {firstName} to scan this with their phone camera or Google Lens, then pay with GPay, PhonePe, Paytm or any UPI app.
+            Ask {firstName} to scan this with PhonePe, GPay, Paytm or any UPI app — name and amount will open automatically.
           </Text>
 
           <View className="mt-3 flex-row items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">

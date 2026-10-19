@@ -12,7 +12,7 @@ import { BookingsRepository } from '../repositories/bookings.repository.js';
 import { PaymentsService } from './payments.service.js';
 import { type RazorpayPayment, RazorpayService, toPaise } from './razorpay.service.js';
 
-const PAID_EVENTS = new Set(['payment.captured', 'order.paid', 'payment_link.paid']);
+const PAID_EVENTS = new Set(['payment.captured', 'order.paid', 'payment_link.paid', 'qr_code.credited']);
 
 interface WebhookEvent {
   event?: string;
@@ -20,6 +20,7 @@ interface WebhookEvent {
     payment?: { entity?: RazorpayPayment };
     payment_link?: { entity?: { notes?: Record<string, unknown> } };
     order?: { entity?: { notes?: Record<string, unknown> } };
+    qr_code?: { entity?: { id?: string; notes?: Record<string, unknown> } };
   };
 }
 
@@ -83,7 +84,16 @@ export class PaymentsController {
   async collectLink(@Param('id') id: string, @CurrentUser() user: AppUser) {
     const booking = await this.creatorBooking(id, user);
     const link = await this.payments.getCollectLink(booking);
-    return { success: true, link: { url: link.url, amount: booking.total, code: booking.code } };
+    return {
+      success: true,
+      link: {
+        url: link.url,
+        upi: link.upi,
+        qrImageUrl: link.qrImageUrl,
+        amount: booking.total,
+        code: booking.code,
+      },
+    };
   }
 
   @Get('creator/jobs/:id/payment')
@@ -108,13 +118,17 @@ export class PaymentsController {
       return { success: true, ignored: true };
     }
 
+    const qrEntity = event.payload?.qr_code?.entity;
     const bookingId =
       event.payload?.payment_link?.entity?.notes?.bookingId ||
+      qrEntity?.notes?.bookingId ||
       event.payload?.order?.entity?.notes?.bookingId ||
       payment.notes?.bookingId;
 
     const booking =
       (typeof bookingId === 'string' && (await this.bookings.findById(bookingId))) ||
+      (typeof qrEntity?.id === 'string' &&
+        (await this.bookings.find(eq(bookings.paymentQrId, qrEntity.id)))) ||
       (payment.order_id && (await this.bookings.find(eq(bookings.paymentOrderId, payment.order_id))));
 
     if (booking && booking.paymentStatus && payment.amount >= toPaise(booking.total)) {

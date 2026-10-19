@@ -22,6 +22,16 @@ interface PaymentLink {
   payments?: { payment_id: string; amount: number; status: string; method?: string }[];
 }
 
+export interface RazorpayQrCode {
+  id: string;
+  image_url: string;
+  /** Present when Razorpay `qr_image_content` is enabled — encode this in our QR for native UPI. */
+  image_content?: string;
+  status: string;
+  payment_amount?: number;
+  notes?: Record<string, string>;
+}
+
 function safeEqualHex(expected: string, actual: unknown) {
   if (typeof actual !== 'string' || actual.length !== expected.length) return false;
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(actual));
@@ -93,6 +103,23 @@ export class RazorpayService {
 
   cancelPaymentLink(linkId: string) {
     return this.request('POST', `/payment_links/${linkId}/cancel`);
+  }
+
+  /** Native UPI QR (PhonePe/GPay open the pay screen directly — not a hosted payment-link URL). */
+  createQrCode(payload: Record<string, unknown>) {
+    return this.request<RazorpayQrCode>('POST', '/payments/qr_codes', payload);
+  }
+
+  fetchQrCode(qrId: string) {
+    return this.request<RazorpayQrCode>('GET', `/payments/qr_codes/${qrId}`);
+  }
+
+  fetchQrPayments(qrId: string) {
+    return this.request<{ items?: RazorpayPayment[] }>('GET', `/payments/qr_codes/${qrId}/payments`);
+  }
+
+  closeQrCode(qrId: string) {
+    return this.request('POST', `/payments/qr_codes/${qrId}/close`);
   }
 
   isCheckoutSignatureValid({ orderId, paymentId, signature }: { orderId: string; paymentId: string; signature: string }) {

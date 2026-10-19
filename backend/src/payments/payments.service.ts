@@ -71,9 +71,9 @@ export class PaymentsService {
       return current as Booking;
     }
 
-    if (via === 'app' && updated.paymentLinkId) {
-      this.razorpay.cancelPaymentLink(updated.paymentLinkId).catch(() => {});
-    }
+    // Close the other collect channels so the customer cannot pay twice.
+    if (updated.paymentLinkId) this.razorpay.cancelPaymentLink(updated.paymentLinkId).catch(() => {});
+    if (updated.paymentQrId) this.razorpay.closeQrCode(updated.paymentQrId).catch(() => {});
 
     this.realtime.notifyBookingChange(updated, BOOKING_EVENTS.PAID);
     return updated;
@@ -81,7 +81,7 @@ export class PaymentsService {
 
   private async findCapturedPayment(booking: Booking) {
     const expected = toPaise(booking.total);
-    const { paymentOrderId: orderId, paymentLinkId: linkId } = booking;
+    const { paymentOrderId: orderId, paymentLinkId: linkId, paymentQrId: qrId } = booking;
 
     if (orderId) {
       const { items = [] } = await this.razorpay.fetchOrderPayments(orderId);
@@ -91,6 +91,12 @@ export class PaymentsService {
         if (payment.status === 'authorized') payment = await this.captureSafely(payment);
         if (payment.status === 'captured' && payment.amount >= expected) return { payment, via: 'app' as const };
       }
+    }
+
+    if (qrId) {
+      const { items = [] } = await this.razorpay.fetchQrPayments(qrId);
+      const paid = items.find((p) => p.status === 'captured' && p.amount >= expected);
+      if (paid) return { payment: paid, via: 'qr' as const };
     }
 
     if (linkId) {
@@ -114,7 +120,7 @@ export class PaymentsService {
   /** Asks Razorpay whether a due booking has been paid (used when no webhook reached us). */
   async syncPayment(booking: Booking): Promise<Booking> {
     if (!isPaymentDue(booking) || !this.razorpay.isConfigured()) return booking;
-    if (!booking.paymentOrderId && !booking.paymentLinkId) return booking;
+    if (!booking.paymentOrderId && !booking.paymentLinkId && !booking.paymentQrId) return booking;
 
     const found = await this.findCapturedPayment(booking);
     return found ? this.finalizePayment(booking, found.payment, found.via) : booking;
@@ -182,41 +188,113 @@ export class PaymentsService {
     return this.finalizePayment(booking, payment, 'app');
   }
 
-  /** Hosted Razorpay payment page the partner shows as a QR code at the venue. */
+  /**
+   * Partner collect at venue:
+   * - `url` = Razorpay payment link (WhatsApp / Copy link — unchanged)
+   * - `upi` = native UPI payload for the on-screen QR (PhonePe/GPay open pay screen directly)
+   */
   async getCollectLink(booking: Booking) {
     assertDue(booking);
     const synced = await this.syncPayment(booking);
     assertDue(synced);
 
-    if (synced.paymentLinkId && synced.paymentLinkUrl) {
-      return { linkId: synced.paymentLinkId, url: synced.paymentLinkUrl };
+    const share = await this.ensurePaymentLink(synced);
+    const upiQr = await this.ensureUpiQr(share.booking);
+    return {
+      linkId: share.linkId,
+      url: share.url,
+      upi: upiQr?.upi || undefined,
+      qrImageUrl: upiQr?.imageUrl || undefined,
+    };
+  }
+
+  private async ensurePaymentLink(booking: Booking) {
+    if (booking.paymentLinkId && booking.paymentLinkUrl) {
+      return { booking, linkId: booking.paymentLinkId, url: booking.paymentLinkUrl };
     }
 
     const link = await this.razorpay.createPaymentLink({
-      amount: toPaise(synced.total),
+      amount: toPaise(booking.total),
       currency: 'INR',
       accept_partial: false,
-      description: `SnapNear ${synced.code} • ${synced.serviceLabel} (${synced.durationLabel})`,
-      reference_id: `${synced.code}-${Date.now().toString(36)}`,
+      description: `SnapNear ${booking.code} • ${booking.serviceLabel} (${booking.durationLabel})`,
+      reference_id: `${booking.code}-${Date.now().toString(36)}`,
       customer: {
-        name: synced.clientName || synced.contactName,
-        contact: `+91${synced.contactPhone}`,
-        ...(synced.clientEmail ? { email: synced.clientEmail } : {}),
+        name: booking.clientName || booking.contactName,
+        contact: `+91${booking.contactPhone}`,
+        ...(booking.clientEmail ? { email: booking.clientEmail } : {}),
       },
       notify: { sms: false, email: false },
       reminder_enable: false,
-      notes: bookingNotes(synced),
+      notes: bookingNotes(booking),
     });
 
-    const saved = await this.bookings.update(and(eq(bookings.id, synced.id), isNull(bookings.paymentLinkId)), {
+    const saved = await this.bookings.update(and(eq(bookings.id, booking.id), isNull(bookings.paymentLinkId)), {
       paymentLinkId: link.id,
       paymentLinkUrl: link.short_url,
     });
     if (!saved) {
       this.razorpay.cancelPaymentLink(link.id).catch(() => {});
-      const current = await this.bookings.findById(synced.id);
-      return { linkId: current?.paymentLinkId, url: current?.paymentLinkUrl };
+      const current = await this.bookings.findById(booking.id);
+      return {
+        booking: current || booking,
+        linkId: current?.paymentLinkId || link.id,
+        url: current?.paymentLinkUrl || link.short_url,
+      };
     }
-    return { linkId: link.id, url: link.short_url };
+    return { booking: saved, linkId: link.id, url: link.short_url };
+  }
+
+  /** Best-effort: if Razorpay UPI QR is not enabled on the account, partners still get the payment-link QR. */
+  private async ensureUpiQr(booking: Booking): Promise<{ upi: string; imageUrl: string } | null> {
+    if (booking.paymentQrId && booking.paymentQrUpi) {
+      return { upi: booking.paymentQrUpi, imageUrl: '' };
+    }
+
+    // Re-fetch payload if we already created a QR but UPI string was missing (feature flag lag).
+    if (booking.paymentQrId && !booking.paymentQrUpi) {
+      try {
+        const existing = await this.razorpay.fetchQrCode(booking.paymentQrId);
+        if (existing.image_content) {
+          await this.bookings.update(eq(bookings.id, booking.id), { paymentQrUpi: existing.image_content });
+          return { upi: existing.image_content, imageUrl: existing.image_url || '' };
+        }
+        if (existing.image_url) return { upi: '', imageUrl: existing.image_url };
+      } catch (err) {
+        console.error(`[payments] Fetch UPI QR failed for ${booking.code}: ${(err as Error).message}`);
+      }
+    }
+
+    try {
+      const closeBy = Math.floor(Date.now() / 1000) + 2 * 60 * 60; // single_use max ~2h
+      const qr = await this.razorpay.createQrCode({
+        type: 'upi_qr',
+        name: 'SnapNear',
+        usage: 'single_use',
+        fixed_amount: true,
+        payment_amount: toPaise(booking.total),
+        description: `SnapNear ${booking.code} • ${booking.serviceLabel}`,
+        close_by: closeBy,
+        notes: bookingNotes(booking),
+      });
+
+      const upi = qr.image_content || '';
+      const saved = await this.bookings.update(and(eq(bookings.id, booking.id), isNull(bookings.paymentQrId)), {
+        paymentQrId: qr.id,
+        paymentQrUpi: upi,
+      });
+      if (!saved) {
+        this.razorpay.closeQrCode(qr.id).catch(() => {});
+        const current = await this.bookings.findById(booking.id);
+        if (current?.paymentQrUpi) return { upi: current.paymentQrUpi, imageUrl: qr.image_url || '' };
+        return qr.image_content || qr.image_url
+          ? { upi: qr.image_content || '', imageUrl: qr.image_url || '' }
+          : null;
+      }
+      return { upi, imageUrl: qr.image_url || '' };
+    } catch (err) {
+      console.error(`[payments] UPI QR create failed for ${booking.code}: ${(err as Error).message}`);
+      return null;
+    }
   }
 }

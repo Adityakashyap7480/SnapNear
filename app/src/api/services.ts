@@ -77,6 +77,7 @@ export const creatorApi = {
   cancelJob: (id: string, data: { reason: string; remark?: string }) =>
     request<BookingRes>('PATCH', '/creator/jobs/:id/cancel', { ...byId(id), data }),
   startShoot: (id: string, otp: string) => request<BookingRes>('POST', '/creator/jobs/:id/start', { ...byId(id), data: { otp } }),
-  collectLink: (id: string) => request<{ link: { linkId: string; url: string } }>('POST', '/creator/jobs/:id/collect', byId(id)),
+  collectLink: (id: string) =>
+    request<{ link: { url: string; upi?: string; qrImageUrl?: string } }>('POST', '/creator/jobs/:id/collect', byId(id)),
   paymentStatus: (id: string) => request<BookingRes>('GET', '/creator/jobs/:id/payment', byId(id)),
 };

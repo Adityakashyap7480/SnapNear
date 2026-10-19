@@ -109,7 +109,7 @@ export class BookingsService {
           return (await this.bookings.update(eq(bookings.id, b.id), newStartOtp())) || b;
         }
         // Catch QR / link payments that completed while nobody was watching
-        if (!isPaymentDue(b) || (!b.paymentOrderId && !b.paymentLinkId)) return b;
+        if (!isPaymentDue(b) || (!b.paymentOrderId && !b.paymentLinkId && !b.paymentQrId)) return b;
         return this.payments.syncPaymentQuietly(b);
       })
     );

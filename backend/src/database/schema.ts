@@ -178,11 +178,15 @@ export const bookings = pgTable(
     startOtpAttempts: integer('start_otp_attempts').notNull().default(0),
     startOtpIssuedAt: ts('start_otp_issued_at'),
 
-    // Customer -> SnapNear (Razorpay). `paymentOrderId` backs in-app checkout, `paymentLinkId` backs the partner's QR.
+    // Customer -> SnapNear (Razorpay).
+    // `paymentOrderId` = in-app checkout; `paymentLinkId` = WhatsApp/copy share URL;
+    // `paymentQrId` + `paymentQrUpi` = on-screen native UPI QR (PhonePe/GPay).
     paymentStatus: paymentStatus('payment_status'),
     paymentOrderId: text('payment_order_id'),
     paymentLinkId: text('payment_link_id'),
     paymentLinkUrl: text('payment_link_url'),
+    paymentQrId: text('payment_qr_id'),
+    paymentQrUpi: text('payment_qr_upi'),
     paymentId: text('payment_id'),
     paymentMethod: text('payment_method'),
     paymentVia: paymentVia('payment_via'),

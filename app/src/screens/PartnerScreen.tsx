@@ -12,7 +12,7 @@ import { Ripple } from '../components/ui/motion';
 import CancelBookingModal from '../components/booking/CancelBookingModal';
 import ActiveJobCard from '../components/partner/ActiveJobCard';
 import CollectPaymentCard from '../components/partner/CollectPaymentCard';
-import PlatformFeeCard from '../components/partner/PlatformFeeCard';
+import PlatformFeeModal from '../components/partner/PlatformFeeModal';
 import JobHistory from '../components/partner/JobHistory';
 import PartnerLocationModal from '../components/partner/PartnerLocationModal';
 import PartnerTermsModal from '../components/partner/PartnerTermsModal';
@@ -288,6 +288,9 @@ export default function PartnerScreen() {
     <View className="gap-6">
       {user?.needsPartnerTerms && <PartnerTermsModal />}
       {!user?.needsPartnerTerms && user?.needsPartnerLocation && <PartnerLocationModal />}
+      {platformFeeDue.length > 0 && (
+        <PlatformFeeModal jobs={platformFeeDue} payingId={feePayingId} onPay={payPlatformFee} />
+      )}
       {celebration && <PaymentCelebration key={celebration.key} celebration={celebration} onClose={closeCelebration} />}
       {qrJob && <PaymentQrModal key={qrJob.id} job={qrJob} onClose={closeQr} onPaid={celebratePayment} />}
       {cancelTarget && !celebration && !qrJob && (
@@ -405,8 +408,6 @@ export default function PartnerScreen() {
           </View>
         </Card>
       )}
-
-      <PlatformFeeCard jobs={platformFeeDue} payingId={feePayingId} onPay={payPlatformFee} />
 
       {awaitingPayment.length > 0 && (
         <CollectPaymentCard jobs={awaitingPayment} onShowQr={setQrJob} onCollectCash={collectCash} cashBusyId={cashBusyId} />

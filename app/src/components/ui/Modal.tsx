@@ -17,16 +17,18 @@ interface ModalProps {
   iconColor?: string;
   children?: ReactNode;
   footer?: ReactNode;
+  /** When false there is no close button, no backdrop tap, and Android back is swallowed. */
+  dismissible?: boolean;
 }
 
-export default function Modal({ open, onClose, title, description, icon: Icon, iconBox = '', iconColor = colors.slate[700], children, footer }: ModalProps) {
+export default function Modal({ open, onClose, title, description, icon: Icon, iconBox = '', iconColor = colors.slate[700], children, footer, dismissible = true }: ModalProps) {
   const { width, height } = useWindowDimensions();
   const wide = width >= 640;
 
   return (
-    <Overlay visible={open} onRequestClose={onClose}>
+    <Overlay visible={open} onRequestClose={dismissible ? onClose : () => {}}>
       <View className={`flex-1 bg-slate-950/50 ${wide ? 'items-center justify-center p-4' : 'justify-end'}`}>
-        <Pressable accessibilityLabel="Close" className="absolute inset-0" onPress={onClose} />
+        {dismissible && <Pressable accessibilityLabel="Close" className="absolute inset-0" onPress={onClose} />}
         <FadeUp
           className={`w-full bg-white ${wide ? 'max-w-md rounded-2xl' : 'rounded-t-2xl'}`}
           style={[shadows['2xl'], { maxHeight: height * 0.92 }]}
@@ -43,9 +45,11 @@ export default function Modal({ open, onClose, title, description, icon: Icon, i
                   <Text className="font-display text-base font-bold text-slate-900">{title}</Text>
                   {description && <Text className="mt-1 text-xs leading-5 text-slate-500">{description}</Text>}
                 </View>
-                <Pressable accessibilityLabel="Close" onPress={onClose} className="-mr-1 -mt-1 rounded-lg p-1.5">
-                  <X size={16} color={colors.slate[400]} />
-                </Pressable>
+                {dismissible && (
+                  <Pressable accessibilityLabel="Close" onPress={onClose} className="-mr-1 -mt-1 rounded-lg p-1.5">
+                    <X size={16} color={colors.slate[400]} />
+                  </Pressable>
+                )}
               </View>
               {children && <View className="mt-4">{children}</View>}
               {footer && <View className={`mt-5 gap-2 ${wide ? 'flex-row justify-end' : 'flex-col-reverse'}`}>{footer}</View>}

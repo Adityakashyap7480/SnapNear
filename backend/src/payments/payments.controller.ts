@@ -102,6 +102,36 @@ export class PaymentsController {
     return this.paymentResponse(await this.payments.syncPayment(await this.creatorBooking(id, user)));
   }
 
+  /** Partner collected the shoot amount in cash at the venue. */
+  @Post('creator/jobs/:id/collect-cash')
+  @HttpCode(200)
+  @Auth(ROLES.CREATOR)
+  async collectCash(@Param('id') id: string, @CurrentUser() user: AppUser) {
+    const paid = await this.payments.collectCash(await this.creatorBooking(id, user));
+    return this.paymentResponse(paid as Booking);
+  }
+
+  /** Partner pays SnapNear's platform share of a cash-collected shoot. */
+  @Post('creator/jobs/:id/platform-fee/pay')
+  @HttpCode(200)
+  @Auth(ROLES.CREATOR)
+  async startPlatformFee(@Param('id') id: string, @CurrentUser() user: AppUser) {
+    const checkout = await this.payments.createPlatformFeeCheckout(await this.creatorBooking(id, user));
+    return { success: true, checkout };
+  }
+
+  @Post('creator/jobs/:id/platform-fee/verify')
+  @HttpCode(200)
+  @Auth(ROLES.CREATOR)
+  async confirmPlatformFee(
+    @Param('id') id: string,
+    @CurrentUser() user: AppUser,
+    @Body(new ZodPipe(verifyPaymentSchema)) body: VerifyPaymentInput
+  ) {
+    const paid = await this.payments.verifyPlatformFee(await this.creatorBooking(id, user), body);
+    return this.paymentResponse(paid as Booking);
+  }
+
   // ----- Razorpay webhook (raw body, see main.ts) -----
 
   @Post('payments/razorpay/webhook')
@@ -129,7 +159,19 @@ export class PaymentsController {
       (typeof bookingId === 'string' && (await this.bookings.findById(bookingId))) ||
       (typeof qrEntity?.id === 'string' &&
         (await this.bookings.find(eq(bookings.paymentQrId, qrEntity.id)))) ||
-      (payment.order_id && (await this.bookings.find(eq(bookings.paymentOrderId, payment.order_id))));
+      (payment.order_id && (await this.bookings.find(eq(bookings.paymentOrderId, payment.order_id)))) ||
+      (payment.order_id && (await this.bookings.find(eq(bookings.platformFeeOrderId, payment.order_id))));
+
+    // Partner paying the platform share of a cash shoot (amount is the fee, not the shoot total).
+    if (
+      booking &&
+      payment.order_id &&
+      booking.platformFeeOrderId === payment.order_id &&
+      payment.amount >= toPaise(booking.platformFee)
+    ) {
+      await this.payments.markPlatformFeePaid(booking, payment);
+      return { success: true };
+    }
 
     if (booking && booking.paymentStatus && payment.amount >= toPaise(booking.total)) {
       const via = payment.order_id && payment.order_id === booking.paymentOrderId ? 'app' : 'qr';

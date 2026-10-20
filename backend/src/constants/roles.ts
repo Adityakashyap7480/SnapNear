@@ -33,6 +33,18 @@ export const SETTLEMENT_STATUS = {
   PAID: 'paid',
 } as const;
 
+/** Cash-collected shoots: the partner owes SnapNear its platform share until they pay it online. */
+export const PLATFORM_FEE_STATUS = {
+  DUE: 'due',
+  PAID: 'paid',
+} as const;
+
+/** Partner payout requests from the Wallet screen, worked manually by the Super Admin. */
+export const PAYOUT_REQUEST_STATUS = {
+  PENDING: 'pending',
+  PAID: 'paid',
+} as const;
+
 export const SERVICE_TYPES = ['photo', 'video'] as const;
 export type ServiceType = (typeof SERVICE_TYPES)[number];
 

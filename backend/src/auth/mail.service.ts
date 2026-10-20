@@ -162,6 +162,79 @@ export class MailService {
     return this.deliver(to, subject, text, html, otp);
   }
 
+  /** Internal alert to the SnapNear support inbox when a partner requests a payout. */
+  async sendPayoutRequestAlert(
+    to: string,
+    info: { partnerName: string; partnerEmail: string; partnerPhone: string; amount: string; upiId: string }
+  ) {
+    const subject = `💸 Payout requested: ${info.amount} by ${info.partnerName}`;
+    const text = [
+      'A SnapNear partner just requested a payout from their Wallet.',
+      '',
+      `Partner: ${info.partnerName}`,
+      `Email: ${info.partnerEmail}`,
+      `Phone: +91 ${info.partnerPhone}`,
+      `Amount requested: ${info.amount}`,
+      `Pay to UPI: ${info.upiId || '(not added)'}`,
+      '',
+      'Open the Super Admin panel → Payouts to send the money and mark it paid.',
+      '',
+      '— SnapNear (automated)',
+    ].join('\n');
+
+    const html = `
+      <p>A SnapNear partner just requested a payout from their Wallet.</p>
+      <table style="font-size:14px;line-height:1.7;color:#0f172a">
+        <tr><td style="color:#64748b;padding-right:12px">Partner</td><td><strong>${info.partnerName}</strong></td></tr>
+        <tr><td style="color:#64748b;padding-right:12px">Email</td><td>${info.partnerEmail}</td></tr>
+        <tr><td style="color:#64748b;padding-right:12px">Phone</td><td>+91 ${info.partnerPhone}</td></tr>
+        <tr><td style="color:#64748b;padding-right:12px">Amount</td><td><strong>${info.amount}</strong></td></tr>
+        <tr><td style="color:#64748b;padding-right:12px">Pay to UPI</td><td>${info.upiId || '(not added)'}</td></tr>
+      </table>
+      <p style="color:#64748b;font-size:13px">Open the Super Admin panel → Payouts to send the money and mark it paid.</p>
+      <p style="color:#94a3b8;font-size:12px">SnapNear · automated alert</p>
+    `;
+
+    return this.deliver(to, subject, text, html);
+  }
+
+  /** Sent to the partner once the Super Admin has transferred their payout. */
+  async sendPayoutSentEmail(
+    to: string,
+    info: { partnerName: string; amount: string; upiId: string; bookingCount: number; reference?: string }
+  ) {
+    const firstName = info.partnerName.split(' ')[0] || 'Partner';
+    const subject = `🎉 Good news ${firstName}! Your SnapNear payout of ${info.amount} is on its way`;
+    const text = [
+      `Hi ${firstName},`,
+      '',
+      `Great news! We have sent your SnapNear payout of ${info.amount} to your UPI ID ${info.upiId}.`,
+      `This covers ${info.bookingCount} completed shoot(s) with SnapNear.`,
+      ...(info.reference ? [`UPI reference / UTR: ${info.reference}`] : []),
+      '',
+      'The money should reflect in your bank account shortly (usually within a few hours, depending on your bank).',
+      'If it does not arrive within 24 hours, just reply to this email and we will sort it out right away.',
+      '',
+      'Thank you for shooting with SnapNear — keep going online to grab more shoots near you!',
+      '',
+      `Warm regards,`,
+      `Team SnapNear`,
+      `${env.supportEmail} · www.snapnear.in`,
+    ].join('\n');
+
+    const html = `
+      <p>Hi ${firstName},</p>
+      <p>Great news! We have sent your SnapNear payout to your UPI ID <strong>${info.upiId}</strong>.</p>
+      <p style="font-size:30px;font-weight:900;color:#047857;margin:12px 0">${info.amount}</p>
+      <p style="color:#475569;font-size:14px">This covers ${info.bookingCount} completed shoot(s) with SnapNear.${info.reference ? `<br/>UPI reference / UTR: <strong>${info.reference}</strong>` : ''}</p>
+      <p style="color:#475569;font-size:14px">The money should reflect in your bank account shortly (usually within a few hours, depending on your bank). If it does not arrive within 24 hours, just reply to this email and we will sort it out right away.</p>
+      <p style="color:#475569;font-size:14px">Thank you for shooting with SnapNear — keep going online to grab more shoots near you!</p>
+      <p style="color:#94a3b8;font-size:12px">Warm regards,<br/>Team SnapNear · ${env.supportEmail} · www.snapnear.in</p>
+    `;
+
+    return this.deliver(to, subject, text, html);
+  }
+
   async sendPasswordResetOtp(to: string, otp: string) {
     const subject = 'Your SnapNear password reset code';
     const text = [

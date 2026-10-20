@@ -1,13 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import { ApiError } from '../common/api-error.js';
+import { MailService } from '../auth/mail.service.js';
 import type { MarkPayoutInput } from '../common/validation.js';
 import { env } from '../config/env.js';
 import { ADMIN_EVENTS, SOCKET_EVENTS } from '../constants/events.js';
-import { PAYMENT_STATUS, ROLES, SETTLEMENT_STATUS } from '../constants/roles.js';
+import { PAYMENT_STATUS, PAYOUT_REQUEST_STATUS, ROLES, SETTLEMENT_STATUS } from '../constants/roles.js';
 import { countOf, minOf, sumOf } from '../database/aggregates.js';
 import { DatabaseService } from '../database/database.service.js';
-import { type Payout, bookings, payouts, users } from '../database/schema.js';
+import { type Payout, bookings, payoutRequests, payouts, users } from '../database/schema.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { UsersRepository } from '../repositories/users.repository.js';
 
@@ -36,7 +37,8 @@ export class PayoutsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly users: UsersRepository,
-    private readonly realtime: RealtimeGateway
+    private readonly realtime: RealtimeGateway,
+    private readonly mail: MailService
   ) {}
 
   private get db() {
@@ -77,7 +79,20 @@ export class PayoutsService {
       this.db.select().from(payouts).orderBy(desc(payouts.paidAt)).limit(30),
     ]);
 
-    const partnerIds = pending.map((p) => p.creatorId).filter((id): id is string => Boolean(id));
+    const [pendingRequests] = await Promise.all([
+      this.db
+        .select()
+        .from(payoutRequests)
+        .where(eq(payoutRequests.status, PAYOUT_REQUEST_STATUS.PENDING))
+        .orderBy(asc(payoutRequests.createdAt)),
+    ]);
+
+    const partnerIds = [
+      ...new Set([
+        ...pending.map((p) => p.creatorId),
+        ...pendingRequests.map((r) => r.creatorId),
+      ]),
+    ].filter((id): id is string => Boolean(id));
     const partners = partnerIds.length ? await this.users.listWithProfiles(inArray(users.id, partnerIds), users.id) : [];
     const partnerMap = Object.fromEntries(partners.map((u) => [u.id, u]));
     const byStatus = Object.fromEntries(collection.map((c) => [c.status, c]));
@@ -114,6 +129,20 @@ export class PayoutsService {
           oldestPaidAt: p.oldestPaidAt,
           nextEligibleAt: p.nextEligibleAt,
           codes: p.codes,
+        };
+      }),
+      requests: pendingRequests.map((r) => {
+        const u = partnerMap[r.creatorId];
+        return {
+          id: r.id,
+          creatorId: r.creatorId,
+          name: u?.name || 'Deleted partner',
+          phone: u?.phone || '',
+          email: u?.email || '',
+          upiId: u?.creatorProfile?.upiId || '',
+          amount: r.amount,
+          status: r.status,
+          createdAt: r.createdAt,
         };
       }),
       history: history.map(serializePayout),
@@ -161,12 +190,33 @@ export class PayoutsService {
       return final;
     });
 
+    // Close out any payout requests the partner raised from their Wallet for this balance.
+    await this.db
+      .update(payoutRequests)
+      .set({ status: PAYOUT_REQUEST_STATUS.PAID, payoutId: payout.id, processedAt: now })
+      .where(
+        and(eq(payoutRequests.creatorId, creator.id), eq(payoutRequests.status, PAYOUT_REQUEST_STATUS.PENDING))
+      );
+
     this.realtime.notifyUser(creator.id, SOCKET_EVENTS.WALLET_PAYOUT, {
       amount: payout.amount,
       bookingCount: payout.bookingCount,
       reference: payout.reference,
     });
     this.realtime.notifyAdmins(ADMIN_EVENTS.PAYOUT_PAID, { creatorId: creator.id, amount: payout.amount });
+
+    // Best-effort: the payout is already recorded, so a mail failure must not fail the request.
+    try {
+      await this.mail.sendPayoutSentEmail(creator.email, {
+        partnerName: creator.name,
+        amount: `₹${Number(payout.amount).toFixed(2)}`,
+        upiId: creator.creatorProfile?.upiId || payout.creatorUpiId || '',
+        bookingCount: payout.bookingCount,
+        reference: payout.reference || undefined,
+      });
+    } catch (err) {
+      console.error(`[payouts] Payout email failed for ${creator.email}: ${(err as Error).message}`);
+    }
 
     return { success: true, payout: serializePayout(payout) };
   }

@@ -61,7 +61,15 @@ export function serializeBooking(
     cancelReason: b.cancelReason || undefined,
     cancelRemark: b.cancelRemark || undefined,
     payment: b.paymentStatus
-      ? { status: b.paymentStatus, method: b.paymentMethod || null, via: b.paymentVia || null, paidAt: b.paidAt || null }
+      ? {
+          status: b.paymentStatus,
+          method: b.paymentMethod || null,
+          via: b.paymentVia || null,
+          paidAt: b.paidAt || null,
+          // Cash shoots only: whether the partner still owes SnapNear its platform share.
+          platformFeeStatus: b.platformFeeStatus || null,
+          platformFeePaidAt: b.platformFeePaidAt || null,
+        }
       : null,
     settlement: b.settlementStatus
       ? { status: b.settlementStatus, eligibleAt: b.settlementEligibleAt || null, paidAt: b.settledAt || null }

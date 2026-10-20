@@ -4,7 +4,7 @@ import { ApiError } from '../common/api-error.js';
 import type { VerifyPaymentInput } from '../common/validation.js';
 import { env } from '../config/env.js';
 import { BOOKING_EVENTS } from '../constants/events.js';
-import { PAYMENT_STATUS, SETTLEMENT_STATUS } from '../constants/roles.js';
+import { PAYMENT_STATUS, PLATFORM_FEE_STATUS, SETTLEMENT_STATUS } from '../constants/roles.js';
 import { type Booking, bookings } from '../database/schema.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { BookingsRepository } from '../repositories/bookings.repository.js';
@@ -16,7 +16,7 @@ const bookingNotes = (booking: Booking) => ({ bookingId: booking.id, code: booki
 
 export const isPaymentDue = (booking: Booking) => booking.paymentStatus === PAYMENT_STATUS.DUE;
 
-type PaidVia = 'app' | 'qr';
+type PaidVia = 'app' | 'qr' | 'cash';
 
 function assertDue(booking: Booking) {
   if (booking.paymentStatus === PAYMENT_STATUS.PAID) {
@@ -41,16 +41,20 @@ export class PaymentsService {
    */
   async finalizePayment(booking: Booking, payment: Pick<RazorpayPayment, 'id' | 'method'>, via: PaidVia) {
     const now = new Date();
+    const isCash = via === 'cash';
     const updated = await this.bookings.update(
       and(eq(bookings.id, booking.id), eq(bookings.paymentStatus, PAYMENT_STATUS.DUE)),
       {
         paymentStatus: PAYMENT_STATUS.PAID,
-        paymentId: payment.id,
+        paymentId: payment.id || null,
         paymentMethod: payment.method || '',
         paymentVia: via,
         paidAt: now,
-        settlementStatus: SETTLEMENT_STATUS.PENDING,
-        settlementEligibleAt: new Date(now.getTime() + env.payoutHoldDays * DAY_MS),
+        // Cash is already in the partner's hands: no SnapNear payout is owed for the shoot,
+        // instead the partner owes the platform share (tracked via platformFeeStatus).
+        settlementStatus: isCash ? null : SETTLEMENT_STATUS.PENDING,
+        settlementEligibleAt: isCash ? null : new Date(now.getTime() + env.payoutHoldDays * DAY_MS),
+        platformFeeStatus: isCash ? PLATFORM_FEE_STATUS.DUE : booking.platformFeeStatus,
       }
     );
 
@@ -186,6 +190,93 @@ export class PaymentsService {
     }
 
     return this.finalizePayment(booking, payment, 'app');
+  }
+
+  /** Partner confirms the customer handed over cash at the venue. */
+  async collectCash(booking: Booking) {
+    assertDue(booking);
+    const synced = await this.syncPayment(booking);
+    assertDue(synced);
+    return this.finalizePayment(synced, { id: '', method: 'cash' }, 'cash');
+  }
+
+  private assertPlatformFeeDue(booking: Booking) {
+    if (booking.paymentStatus !== PAYMENT_STATUS.PAID || booking.paymentVia !== 'cash') {
+      throw ApiError.conflict('Platform fee applies only to cash-collected shoots');
+    }
+    if (booking.platformFeeStatus === PLATFORM_FEE_STATUS.PAID) {
+      throw ApiError.conflict('Platform fee is already paid for this shoot. Thank you!');
+    }
+    if (booking.platformFeeStatus !== PLATFORM_FEE_STATUS.DUE) {
+      throw ApiError.conflict('No platform fee is due for this shoot');
+    }
+  }
+
+  /** Razorpay checkout for the partner to pay SnapNear's platform share of a cash shoot. */
+  async createPlatformFeeCheckout(booking: Booking) {
+    this.assertPlatformFeeDue(booking);
+
+    let orderId = booking.platformFeeOrderId;
+    if (!orderId) {
+      const order = await this.razorpay.createOrder({
+        amount: booking.platformFee,
+        receipt: `${booking.code}-FEE`,
+        notes: { ...bookingNotes(booking), purpose: 'platform_fee' },
+      });
+      const saved = await this.bookings.update(
+        and(eq(bookings.id, booking.id), isNull(bookings.platformFeeOrderId)),
+        { platformFeeOrderId: order.id }
+      );
+      orderId = saved ? order.id : (await this.bookings.findById(booking.id))?.platformFeeOrderId ?? null;
+    }
+
+    return {
+      keyId: env.razorpay.keyId,
+      orderId,
+      amount: toPaise(booking.platformFee),
+      currency: 'INR',
+      name: 'SnapNear',
+      description: `Platform fee • ${booking.code} (${booking.serviceLabel})`,
+      prefill: {
+        name: booking.creatorName || '',
+        email: booking.creatorEmail || '',
+        contact: booking.creatorPhone || '',
+      },
+      notes: { ...bookingNotes(booking), purpose: 'platform_fee' },
+    };
+  }
+
+  /** Marks the platform fee paid exactly once (used by REST verify and the Razorpay webhook). */
+  async markPlatformFeePaid(booking: Booking, payment: Pick<RazorpayPayment, 'id' | 'method'>) {
+    const updated = await this.bookings.update(
+      and(eq(bookings.id, booking.id), eq(bookings.platformFeeStatus, PLATFORM_FEE_STATUS.DUE)),
+      {
+        platformFeeStatus: PLATFORM_FEE_STATUS.PAID,
+        platformFeePaymentId: payment.id,
+        platformFeePaidAt: new Date(),
+      }
+    );
+    if (updated) this.realtime.notifyBookingChange(updated, BOOKING_EVENTS.PAID);
+    return updated || (await this.bookings.findById(booking.id));
+  }
+
+  async verifyPlatformFee(booking: Booking, { orderId, paymentId, signature }: VerifyPaymentInput) {
+    this.assertPlatformFeeDue(booking);
+    if (!booking.platformFeeOrderId || orderId !== booking.platformFeeOrderId) {
+      throw ApiError.badRequest('This payment does not belong to this shoot');
+    }
+    if (!this.razorpay.isCheckoutSignatureValid({ orderId, paymentId, signature })) {
+      throw ApiError.badRequest('Payment verification failed. If money was deducted, it will be refunded automatically.');
+    }
+
+    let payment = await this.razorpay.fetchPayment(paymentId);
+    if (payment.order_id !== orderId) throw ApiError.badRequest('This payment does not belong to this shoot');
+    if (payment.status === 'authorized') payment = await this.captureSafely(payment);
+    if (payment.status !== 'captured' || payment.amount < toPaise(booking.platformFee)) {
+      throw new ApiError(402, 'Payment is not complete yet. Please try again in a moment.');
+    }
+
+    return this.markPlatformFeePaid(booking, payment);
   }
 
   /**

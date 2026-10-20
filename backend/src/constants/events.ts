@@ -35,4 +35,5 @@ export const ADMIN_EVENTS = Object.freeze({
   USER_STATUS: 'user:status',
   CREATOR_DUTY: 'creator:duty',
   PAYOUT_PAID: 'payout:paid',
+  PAYOUT_REQUESTED: 'payout:requested',
 });

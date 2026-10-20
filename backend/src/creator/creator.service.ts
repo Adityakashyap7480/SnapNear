@@ -13,11 +13,13 @@ import {
   type BookingStatus,
   CREATOR_TRANSITIONS,
   PAYMENT_STATUS,
+  PAYOUT_REQUEST_STATUS,
   SETTLEMENT_STATUS,
 } from '../constants/roles.js';
 import { countOf, minOf, sumOf } from '../database/aggregates.js';
 import { DatabaseService } from '../database/database.service.js';
-import { type NewBooking, bookingDeclines, bookings, payouts } from '../database/schema.js';
+import { type NewBooking, bookingDeclines, bookings, payoutRequests, payouts } from '../database/schema.js';
+import { MailService } from '../auth/mail.service.js';
 import { PushService } from '../notifications/push.service.js';
 import { PaymentsService, isPaymentDue } from '../payments/payments.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
@@ -57,7 +59,8 @@ export class CreatorService {
     private readonly users: UsersRepository,
     private readonly payments: PaymentsService,
     private readonly realtime: RealtimeGateway,
-    private readonly push: PushService
+    private readonly push: PushService,
+    private readonly mail: MailService
   ) {}
 
   private get db() {
@@ -185,6 +188,17 @@ export class CreatorService {
       isPaymentDue
     );
 
+    // Cash-collected shoots whose platform share the partner has not paid yet.
+    // Persisted server-side so the pay card survives logout/login until it is paid.
+    const platformFeeDueJobs = await this.db
+      .select()
+      .from(bookings)
+      .where(
+        and(mine, eq(bookings.paymentStatus, PAYMENT_STATUS.PAID), eq(bookings.platformFeeStatus, 'due'))
+      )
+      .orderBy(desc(bookings.paidAt))
+      .limit(10);
+
     const [requests, activeJobs, history, stats, wallet] = await Promise.all([
       isOnline ? this.nearbyOpenRequests(creator, 20) : Promise.resolve([]),
       this.activeJobsFor(creator.id),
@@ -211,9 +225,60 @@ export class CreatorService {
       activeJobs: activeJobs.map((b) => serializeBooking(b)),
       activeJob: activeJobs[0] ? serializeBooking(activeJobs[0]) : null,
       awaitingPayment: awaitingPayment.map((b) => serializeBooking(b)),
+      platformFeeDue: platformFeeDueJobs.map((b) => serializeBooking(b)),
       history: history.map((b) => serializeBooking(b)),
       stats,
       wallet,
+    };
+  }
+
+  /**
+   * Partner tapped "Request Payout" in their Wallet: record the request, alert the
+   * support inbox, and ping the Super Admin panel. Money moves manually from there.
+   */
+  async requestPayout(current: AppUser) {
+    const creator = current.doc;
+    const wallet = await this.computeWallet(creator);
+    const amount = Math.round(Number(wallet.balance || 0) * 100) / 100;
+    if (amount <= 0) throw ApiError.conflict('You have no payout balance to request yet');
+
+    const [existing] = await this.db
+      .select()
+      .from(payoutRequests)
+      .where(and(eq(payoutRequests.creatorId, creator.id), eq(payoutRequests.status, PAYOUT_REQUEST_STATUS.PENDING)))
+      .limit(1);
+    if (existing) {
+      throw ApiError.conflict('Your payout is already requested. It will reach your UPI within 24 hours.');
+    }
+
+    const [request] = await this.db
+      .insert(payoutRequests)
+      .values({ creatorId: creator.id, amount, status: PAYOUT_REQUEST_STATUS.PENDING })
+      .returning();
+
+    // Best-effort alert: the request itself is already saved, so mail trouble must not fail it.
+    try {
+      await this.mail.sendPayoutRequestAlert(env.supportEmail, {
+        partnerName: creator.name,
+        partnerEmail: creator.email,
+        partnerPhone: creator.phone,
+        amount: `₹${amount.toFixed(2)}`,
+        upiId: wallet.upiId || '',
+      });
+    } catch (err) {
+      console.error(`[payouts] Support alert failed for ${creator.email}: ${(err as Error).message}`);
+    }
+
+    this.realtime.notifyAdmins(ADMIN_EVENTS.PAYOUT_REQUESTED, {
+      requestId: request.id,
+      creatorId: creator.id,
+      creatorName: creator.name,
+      amount,
+    });
+
+    return {
+      success: true,
+      request: { id: request.id, amount, status: request.status, createdAt: request.createdAt },
     };
   }
 
@@ -251,7 +316,7 @@ export class CreatorService {
     if (needsPartnerTerms(creator)) throw ApiError.forbidden(TERMS_REQUIRED_MESSAGE);
     if (needsPartnerLocation(creator)) throw ApiError.forbidden('Share your current location before accepting shoots');
     if (!creator.creatorProfile?.upiId?.trim()) {
-      throw ApiError.forbidden('Add your UPI ID under Earnings & Payouts before you can accept shoots');
+      throw ApiError.forbidden('Add your UPI ID under Wallet before you can accept shoots');
     }
     if (!creator.creatorProfile?.isOnline) {
       throw ApiError.badRequest('Go online to accept shoot requests');

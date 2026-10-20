@@ -46,7 +46,7 @@ export const accountStatus = pgEnum('account_status', values(ACCOUNT_STATUS));
 export const serviceType = pgEnum('service_type', SERVICE_TYPES);
 export const bookingStatus = pgEnum('booking_status', values(BOOKING_STATUS));
 export const paymentStatus = pgEnum('payment_status', values(PAYMENT_STATUS));
-export const paymentVia = pgEnum('payment_via', ['app', 'qr']);
+export const paymentVia = pgEnum('payment_via', ['app', 'qr', 'cash']);
 export const settlementStatus = pgEnum('settlement_status', values(SETTLEMENT_STATUS));
 export const cancelledBy = pgEnum('cancelled_by', ['client', 'creator', 'superadmin']);
 
@@ -120,6 +120,28 @@ export const payouts = pgTable(
     ...timestamps(),
   },
   (t) => [index('payouts_creator_idx').on(t.creatorId, t.paidAt), index('payouts_paid_at_idx').on(t.paidAt)]
+);
+
+/** Partner tapped "Request Payout" in their Wallet; the Super Admin works these manually. */
+export const payoutRequests = pgTable(
+  'payout_requests',
+  {
+    id: id(),
+    creatorId: text('creator_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    /** Wallet balance (partner share) at the moment of the request. */
+    amount: money('amount').notNull(),
+    /** pending -> paid (see PAYOUT_REQUEST_STATUS) */
+    status: text('status').notNull().default('pending'),
+    payoutId: text('payout_id').references(() => payouts.id, { onDelete: 'set null' }),
+    processedAt: ts('processed_at'),
+    ...timestamps(),
+  },
+  (t) => [
+    index('payout_requests_creator_idx').on(t.creatorId, t.status),
+    index('payout_requests_status_idx').on(t.status, t.createdAt),
+  ]
 );
 
 export const bookings = pgTable(
@@ -197,6 +219,14 @@ export const bookings = pgTable(
     settlementEligibleAt: ts('settlement_eligible_at'),
     payoutId: text('payout_id').references(() => payouts.id, { onDelete: 'set null' }),
     settledAt: ts('settled_at'),
+
+    // Cash-collected shoots: partner keeps the cash and owes the platform share.
+    // `platformFeeStatus` stays 'due' (with a Razorpay order in `platformFeeOrderId`)
+    // until the partner pays it online; only then is the shoot fully settled.
+    platformFeeStatus: text('platform_fee_status'),
+    platformFeeOrderId: text('platform_fee_order_id'),
+    platformFeePaymentId: text('platform_fee_payment_id'),
+    platformFeePaidAt: ts('platform_fee_paid_at'),
 
     ...timestamps(),
   },

@@ -29,6 +29,13 @@ export class CreatorController {
     return this.creator.acceptTerms(user);
   }
 
+  /** Partner requests a payout of their current Wallet balance. */
+  @Post('payout-request')
+  @HttpCode(201)
+  requestPayout(@CurrentUser() user: AppUser) {
+    return this.creator.requestPayout(user);
+  }
+
   @Patch('status')
   setDutyStatus(@CurrentUser() user: AppUser, @Body(new ZodPipe(dutyStatusSchema)) body: { isOnline: boolean }) {
     return this.creator.setDutyStatus(user, body.isOnline);

@@ -64,7 +64,11 @@ export class RazorpayService {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const reason = data?.error?.description || `HTTP ${res.status}`;
-      console.error(`[razorpay] ${method} ${path} failed: ${reason}`);
+      // Keep the full gateway error in server logs so dashboard-side issues (e.g. a product
+      // that is not activated on the live account) are diagnosable from Render logs alone.
+      console.error(
+        `[razorpay] ${method} ${path} failed: status=${res.status} code=${data?.error?.code || '-'} reason=${data?.error?.reason || '-'}: ${reason}`
+      );
       throw new ApiError(502, `Payment gateway error: ${reason}`);
     }
     return data as T;

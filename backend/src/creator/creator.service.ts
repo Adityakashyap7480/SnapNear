@@ -13,6 +13,7 @@ import {
   type BookingStatus,
   CREATOR_TRANSITIONS,
   PAYMENT_STATUS,
+  PLATFORM_FEE_STATUS,
   PAYOUT_REQUEST_STATUS,
   SETTLEMENT_STATUS,
 } from '../constants/roles.js';
@@ -42,6 +43,8 @@ const TIMESTAMP_FOR_STATUS: Partial<Record<BookingStatus, 'arrivedAt' | 'started
 };
 
 const TERMS_REQUIRED_MESSAGE = 'Please accept the SnapNear Partner Terms to continue';
+const PLATFORM_FEE_PENDING_MESSAGE =
+  'You have a pending platform fee. Pay it to start receiving new shoots.';
 
 const startOfToday = () => {
   const d = new Date();
@@ -173,6 +176,22 @@ export class CreatorService {
     return rows.sort((a, b) => rank(a.status) - rank(b.status) || a.shootDate.localeCompare(b.shootDate));
   }
 
+  /** True while the partner owes SnapNear's share on any cash-collected shoot. */
+  private async hasPlatformFeeDue(creatorId: string) {
+    const [row] = await this.db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.creatorId, creatorId),
+          eq(bookings.paymentStatus, PAYMENT_STATUS.PAID),
+          eq(bookings.platformFeeStatus, PLATFORM_FEE_STATUS.DUE)
+        )
+      )
+      .limit(1);
+    return Boolean(row);
+  }
+
   async dashboard(current: AppUser) {
     const creator = current.doc;
     const isOnline = Boolean(creator.creatorProfile?.isOnline);
@@ -199,8 +218,10 @@ export class CreatorService {
       .orderBy(desc(bookings.paidAt))
       .limit(10);
 
+    // A partner who owes the platform fee gets no new shoots until it is paid.
+    const feeBlocked = platformFeeDueJobs.length > 0;
     const [requests, activeJobs, history, stats, wallet] = await Promise.all([
-      isOnline ? this.nearbyOpenRequests(creator, 20) : Promise.resolve([]),
+      isOnline && !feeBlocked ? this.nearbyOpenRequests(creator, 20) : Promise.resolve([]),
       this.activeJobsFor(creator.id),
       this.db
         .select()
@@ -320,6 +341,9 @@ export class CreatorService {
     }
     if (!creator.creatorProfile?.isOnline) {
       throw ApiError.badRequest('Go online to accept shoot requests');
+    }
+    if (await this.hasPlatformFeeDue(creator.id)) {
+      throw ApiError.forbidden(PLATFORM_FEE_PENDING_MESSAGE);
     }
 
     const candidate = await this.bookings.find(and(eq(bookings.id, id), this.openRequests(creator)));

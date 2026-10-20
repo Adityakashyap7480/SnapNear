@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, PanResponder, View } from 'react-native';
 import { ChevronsRight } from 'lucide-react-native';
 import Text from './Text';
@@ -26,31 +26,44 @@ export default function SwipeButton({ label, onSwipe, loading = false, disabled 
   const max = Math.max(0, trackWidth - THUMB - 8);
   const isDisabled = disabled || loading;
 
-  const setDrag = (value: number) => {
-    const next = Math.min(Math.max(0, value), max);
+  // The PanResponder is created once and keeps its first callbacks, so everything those
+  // callbacks touch must live in refs. Capturing first-render values (trackWidth still 0,
+  // so max = 0) would clamp the thumb to 0 forever and the swipe could never move.
+  const maxRef = useRef(0);
+  maxRef.current = max;
+  const disabledRef = useRef(isDisabled);
+  disabledRef.current = isDisabled;
+  const onSwipeRef = useRef(onSwipe);
+  onSwipeRef.current = onSwipe;
+
+  const setDrag = useCallback((value: number) => {
+    const next = Math.min(Math.max(0, value), maxRef.current);
     offsetRef.current = next;
     setOffset(next);
-  };
+  }, []);
 
-  const complete = () => {
-    if (isDisabled || firedRef.current) return;
+  const complete = useCallback(() => {
+    if (disabledRef.current || firedRef.current) return;
     firedRef.current = true;
-    setDrag(max);
-    onSwipe();
+    setDrag(maxRef.current);
+    onSwipeRef.current();
     // Let the parent drive the end state (busy/success); reset so it can be used again.
     setTimeout(() => {
       firedRef.current = false;
       setDrag(0);
     }, 600);
-  };
+  }, [setDrag]);
 
   const pan = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => !disabledRef.current,
+      onMoveShouldSetPanResponder: () => !disabledRef.current,
+      onMoveShouldSetPanResponderCapture: () => !disabledRef.current,
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
       onPanResponderMove: (_e, gesture) => setDrag(gesture.dx),
       onPanResponderRelease: (_e, gesture) => {
-        if (max > 0 && gesture.dx >= max * TRIGGER_RATIO) complete();
+        if (maxRef.current > 0 && gesture.dx >= maxRef.current * TRIGGER_RATIO) complete();
         else setDrag(0);
       },
       onPanResponderTerminate: () => setDrag(0),
@@ -83,7 +96,7 @@ export default function SwipeButton({ label, onSwipe, loading = false, disabled 
         accessibilityHint="Swipe right or double tap to confirm"
         onAccessibilityTap={complete}
         className="absolute top-1 h-[52px] w-[52px] items-center justify-center rounded-full bg-white"
-        style={{ left: offset + 4, ...(shadows.lg as object) }}
+        style={{ left: offset + 4, ...({ touchAction: 'none', userSelect: 'none', cursor: 'grab' } as object), ...(shadows.lg as object) }}
       >
         {loading ? (
           <ActivityIndicator size="small" color={colors.emerald[700]} />

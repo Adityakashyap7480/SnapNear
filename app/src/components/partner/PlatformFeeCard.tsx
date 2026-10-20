@@ -67,7 +67,7 @@ export default function PlatformFeeCard({ jobs, payingId, onPay, embedded = fals
       </View>
 
       <Text className="text-[11px] leading-[18px] text-red-500">
-        Jab tak fee pay nahi hoti, naye shoots nahi milenge. Pay karte hi ye popup khud hat jayega.
+        Until this fee is paid, you won&apos;t receive new shoots. This popup clears automatically once you pay.
       </Text>
     </View>
   );

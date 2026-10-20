@@ -23,7 +23,7 @@ export default function PlatformFeeModal({ jobs, payingId, onPay }: PlatformFeeM
       dismissible={false}
       onClose={() => {}}
       title="Platform fee pending"
-      description="You collected cash for a shoot — pay SnapNear's share to unlock new shoots. Jab tak fee clear nahi hogi, koi naya shoot nahi milega."
+      description="You collected cash for a shoot — pay SnapNear's share to unlock new shoots. Until the fee is cleared, you won't receive any new shoots."
       icon={Landmark}
       iconBox="bg-red-100"
       iconColor="#b91c1c"

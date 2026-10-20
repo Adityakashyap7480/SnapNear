@@ -111,6 +111,7 @@ export function getShootPhase(leftMs: number, totalMs: number): ShootPhase {
 
 const METHOD_LABELS: Record<string, string> = {
   upi: 'UPI',
+  cash: 'Cash',
   card: 'Card',
   netbanking: 'Net Banking',
   wallet: 'Wallet',

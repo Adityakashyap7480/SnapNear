@@ -80,4 +80,11 @@ export const creatorApi = {
   collectLink: (id: string) =>
     request<{ link: { url: string; upi?: string; qrImageUrl?: string } }>('POST', '/creator/jobs/:id/collect', byId(id)),
   paymentStatus: (id: string) => request<BookingRes>('GET', '/creator/jobs/:id/payment', byId(id)),
+  collectCash: (id: string) => request<BookingRes>('POST', '/creator/jobs/:id/collect-cash', byId(id)),
+  requestPayout: () =>
+    request<{ request: { id: string; amount: number; status: string } }>('POST', '/creator/payout-request'),
+  startPlatformFee: (id: string) =>
+    request<{ checkout: RazorpayCheckout }>('POST', '/creator/jobs/:id/platform-fee/pay', byId(id)),
+  verifyPlatformFee: (id: string, data: RazorpayResult) =>
+    request<BookingRes>('POST', '/creator/jobs/:id/platform-fee/verify', { ...byId(id), data }),
 };

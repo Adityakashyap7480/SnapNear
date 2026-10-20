@@ -31,7 +31,7 @@ export default function ProfileWalletScreen() {
     [isPartner]
   );
 
-  if (loading) return <PageLoader label="Loading earnings..." />;
+  if (loading) return <PageLoader label={isPartner ? 'Loading wallet...' : 'Loading payments...'} />;
   if (error || !data) return <Text className="px-4 py-10 text-center text-sm text-red-600">{error || 'Unable to load'}</Text>;
 
   if (data.kind === 'partner') {
@@ -39,7 +39,7 @@ export default function ProfileWalletScreen() {
     return (
       <View className="gap-5 px-4 py-5">
         <Text className="text-sm text-slate-500">
-          Your SnapNear earnings and payouts. Add or change your UPI ID below — required before you can accept shoots.
+          Your SnapNear wallet — earnings, payouts and your UPI ID. Add or change your UPI ID below — required before you can accept shoots.
         </Text>
         <Grid cols={2}>
           <StatCard

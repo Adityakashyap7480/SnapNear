@@ -29,6 +29,8 @@ export interface Celebration {
   method?: string | null;
   /** Partner: their share credited to earnings / payout balance */
   credited?: number;
+  /** Cash collects: SnapNear platform share the partner still has to pay online. */
+  platformFee?: number;
   holdDays?: number;
   /** The other party's name */
   counterpart?: string | null;
@@ -54,7 +56,17 @@ function useCountUp(target: number, running: boolean, duration = 1000) {
 
 function copyFor(c: Celebration, partnerPct: string) {
   const first = (name?: string | null) => name?.split(' ')[0] || '';
+  const isCash = c.method === 'cash';
   if (c.role === 'partner') {
+    if (isCash) {
+      return {
+        eyebrow: 'Cash collected! 💵',
+        title: 'Payment Received!',
+        amountLabel: `${first(c.counterpart) || 'Customer'} paid in cash`,
+        message: `You collected ${formatINR(c.amount, { fixed: true })} in cash. Your ${partnerPct} (${formatINR(c.credited, { fixed: true })}) is already yours — just pay SnapNear's platform fee of ${formatINR(c.platformFee, { fixed: true })} online from the fee card on your home screen.`,
+        chip: { icon: Wallet as LucideIcon, text: `Cash in hand • Fee ${formatINR(c.platformFee, { fixed: true })} due`, box: 'bg-emerald-50', text_: 'text-emerald-700', color: colors.emerald[700] },
+      };
+    }
     return {
       eyebrow: 'Ka-ching! 💸',
       title: 'Payment Received!',
@@ -68,7 +80,9 @@ function copyFor(c: Celebration, partnerPct: string) {
     title: 'Payment Successful!',
     amountLabel: 'Amount paid',
     message: `Your payment for ${c.code} is confirmed${c.counterpart ? ` and ${first(c.counterpart)} has been notified` : ''}. Enjoy your photos!`,
-    chip: { icon: ShieldCheck as LucideIcon, text: 'Paid securely to SnapNear via Razorpay', box: 'bg-indigo-50', text_: 'text-brand-violet', color: colors.brand.violet },
+    chip: isCash
+      ? { icon: ShieldCheck as LucideIcon, text: 'Paid in cash to your photographer', box: 'bg-indigo-50', text_: 'text-brand-violet', color: colors.brand.violet }
+      : { icon: ShieldCheck as LucideIcon, text: 'Paid securely to SnapNear via Razorpay', box: 'bg-indigo-50', text_: 'text-brand-violet', color: colors.brand.violet },
   };
 }
 

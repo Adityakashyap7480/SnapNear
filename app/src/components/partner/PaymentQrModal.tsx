@@ -130,7 +130,9 @@ export default function PaymentQrModal({ job, onClose, onPaid }: PaymentQrModalP
           </View>
           <Text className="mt-3 font-display text-3xl font-black text-slate-900">{formatINR(job.total)}</Text>
           <Text className="mt-1 max-w-xs text-center text-xs leading-5 text-slate-500">
-            Ask {firstName} to scan this with PhonePe, GPay, Paytm or any UPI app — name and amount will open automatically.
+            {link.upi || link.qrImageUrl
+              ? `Ask ${firstName} to scan this with PhonePe, GPay, Paytm or any UPI app — name and amount will open automatically.`
+              : `Ask ${firstName} to scan this with their phone camera or Google Lens, then pay with GPay, PhonePe, Paytm or any UPI app.`}
           </Text>
 
           <View className="mt-3 flex-row items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5">

@@ -85,8 +85,11 @@ export interface Catalog {
 export interface Payment {
   status: 'due' | 'paid';
   method: string | null;
-  via: 'app' | 'qr' | null;
+  via: 'app' | 'qr' | 'cash' | null;
   paidAt: string | null;
+  /** Cash shoots only: partner still owes the platform share until this is 'paid'. */
+  platformFeeStatus?: 'due' | 'paid' | null;
+  platformFeePaidAt?: string | null;
 }
 
 export interface Booking {
@@ -194,6 +197,8 @@ export interface CreatorDashboard {
   activeJobs?: Booking[];
   activeJob: Booking | null;
   awaitingPayment: Booking[];
+  /** Cash-collected shoots whose platform fee the partner has not paid yet. */
+  platformFeeDue?: Booking[];
   history: Booking[];
   stats: CreatorStats;
   wallet: Wallet;

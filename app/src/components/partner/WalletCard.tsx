@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { View, useWindowDimensions } from 'react-native';
-import { CalendarClock, Hourglass, Landmark, Pencil, Send, Wallet as WalletIcon } from 'lucide-react-native';
+import { CalendarClock, HandCoins, Hourglass, Landmark, Pencil, Send, Wallet as WalletIcon } from 'lucide-react-native';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import { Input } from '../ui/FormField';
 import Gradient from '../ui/Gradient';
+import Modal from '../ui/Modal';
 import Text from '../ui/Text';
 import { creatorApi } from '../../api/services';
 import { useCatalog } from '../../context/CatalogContext';
@@ -99,9 +100,26 @@ function UpiIdEditor({ upiId, onSaved }: { upiId: string; onSaved: () => void })
 export default function WalletCard({ wallet, onChanged }: { wallet: Wallet; onChanged: () => void }) {
   const { partnerPct } = useCatalog();
   const { width } = useWindowDimensions();
+  const [payoutRequested, setPayoutRequested] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const lg = width >= 1024;
 
+  /** Records the request server-side (support email + Super Admin alert), then shows the 24h promise. */
+  const requestPayout = async () => {
+    if (requesting) return;
+    setRequesting(true);
+    try {
+      await creatorApi.requestPayout();
+      setPayoutRequested(true);
+    } catch (err) {
+      toast.error((err as ApiFailure).message);
+    } finally {
+      setRequesting(false);
+    }
+  };
+
   return (
+    <>
     <Card className={`overflow-hidden ${lg ? 'flex-row' : ''}`}>
       <Gradient colors={[colors.slate[900], colors.brand.navy]} to="br" className={`p-4 sm:p-5 ${lg ? 'flex-1' : ''}`}>
         <View className="flex-row flex-wrap items-start justify-between gap-2">
@@ -124,6 +142,19 @@ export default function WalletCard({ wallet, onChanged }: { wallet: Wallet; onCh
             ? `${wallet.balanceCount} paid shoot(s) • sent to your UPI within ${wallet.holdDays} days of payment`
             : `Your ${partnerPct} from paid shoots lands here`}
         </Text>
+
+        {wallet.balance > 0 && (
+          <Button
+            testID="request-payout"
+            variant="success"
+            icon={HandCoins}
+            className="mt-4"
+            loading={requesting}
+            onPress={requestPayout}
+          >
+            Request Payout • {formatINR(wallet.balance, { fixed: true })}
+          </Button>
+        )}
 
         <View className="mt-4 flex-row gap-2">
           <View className="flex-1 rounded-xl border border-white/10 bg-white/5 p-2.5">
@@ -180,5 +211,30 @@ export default function WalletCard({ wallet, onChanged }: { wallet: Wallet; onCh
         </View>
       </View>
     </Card>
+
+      <Modal
+        open={payoutRequested}
+        onClose={() => setPayoutRequested(false)}
+        title="Payout requested 🎉"
+        description="Sit back — SnapNear will send your money to your UPI."
+        icon={HandCoins}
+        iconBox="bg-emerald-100"
+        iconColor={colors.emerald[700]}
+        footer={
+          <Button variant="success" onPress={() => setPayoutRequested(false)}>
+            Great, thanks!
+          </Button>
+        }
+      >
+        <View className="items-center gap-2 rounded-xl bg-emerald-50 p-4">
+          <Text className="font-display text-2xl font-black text-emerald-700">{formatINR(wallet.balance, { fixed: true })}</Text>
+          <Text className="text-center text-xs leading-5 text-slate-600">
+            Your payout of {formatINR(wallet.balance, { fixed: true })} will reach your UPI{' '}
+            <Text className="font-bold text-slate-800">{wallet.upiId || ''}</Text> within{' '}
+            <Text className="font-bold text-slate-800">24 hours</Text>. We will notify you as soon as it is sent.
+          </Text>
+        </View>
+      </Modal>
+    </>
   );
 }

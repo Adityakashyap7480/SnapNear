@@ -12,6 +12,7 @@ import { Ripple } from '../components/ui/motion';
 import CancelBookingModal from '../components/booking/CancelBookingModal';
 import ActiveJobCard from '../components/partner/ActiveJobCard';
 import CollectPaymentCard from '../components/partner/CollectPaymentCard';
+import PlatformFeeCard from '../components/partner/PlatformFeeCard';
 import JobHistory from '../components/partner/JobHistory';
 import PartnerLocationModal from '../components/partner/PartnerLocationModal';
 import PartnerTermsModal from '../components/partner/PartnerTermsModal';
@@ -30,6 +31,7 @@ import { useSocketEvent } from '../context/SocketContext';
 import useAsync from '../hooks/useAsync';
 import useLiveReload from '../hooks/useLiveReload';
 import useShootAlerts from '../hooks/useShootAlerts';
+import { openRazorpayCheckout } from '../lib/checkout';
 import { confirmAction } from '../lib/confirm';
 import { playChime, vibrate } from '../lib/sound';
 import toast from '../lib/toast';
@@ -50,12 +52,14 @@ export default function PartnerScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const busyLock = useRef<string | null>(null);
   const [qrJob, setQrJob] = useState<Booking | null>(null);
+  const [cashBusyId, setCashBusyId] = useState<string | null>(null);
+  const [feePayingId, setFeePayingId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<(Celebration & { key: string }) | null>(null);
   const celebrated = useRef(new Set<string>());
 
-  // After saving UPI under Earnings & Payouts, hide the warning as soon as partner returns here.
+  // After saving UPI under Wallet, hide the warning as soon as partner returns here.
   useFocusEffect(
     useCallback(() => {
       void reload();
@@ -73,6 +77,7 @@ export default function PartnerScreen() {
         role: 'partner',
         amount: booking.total,
         credited: booking.creatorPayout,
+        platformFee: booking.payment?.method === 'cash' ? booking.platformFee : undefined,
         code: booking.code,
         counterpart: booking.client?.name,
         method: booking.payment?.method,
@@ -93,7 +98,8 @@ export default function PartnerScreen() {
   const liveTracking = Boolean(
     data?.profile.creatorProfile.isOnline ||
       activeJobs.length > 0 ||
-      (data?.awaitingPayment?.length ?? 0) > 0
+      (data?.awaitingPayment?.length ?? 0) > 0 ||
+      (data?.platformFeeDue?.length ?? 0) > 0
   );
   useLiveReload({ active: liveTracking, reload });
 
@@ -130,11 +136,11 @@ export default function PartnerScreen() {
   if (loading) return <PageLoader label="Loading SnapNear Partner..." />;
   if (error || !data) return <Text className="py-20 text-center text-sm text-red-600">{error}</Text>;
 
-  const { profile, requests, awaitingPayment, history, stats, wallet } = data;
+  const { profile, requests, awaitingPayment, platformFeeDue = [], history, stats, wallet } = data;
   const cp = profile.creatorProfile;
   const online = cp.isOnline;
   const hasUpi = Boolean(wallet.upiId?.trim());
-  const upiBlockedReason = !hasUpi ? 'Add your UPI ID under Earnings & Payouts first' : undefined;
+  const upiBlockedReason = !hasUpi ? 'Add your UPI ID under Wallet first' : undefined;
 
   const toggleDuty = async () => {
     setTogglingDuty(true);
@@ -151,7 +157,7 @@ export default function PartnerScreen() {
 
   const accept = async (req: Booking) => {
     if (!hasUpi) {
-      toast.error('Add your UPI ID under Earnings & Payouts before accepting shoots');
+      toast.error('Add your UPI ID under Wallet before accepting shoots');
       router.push(ROUTES.PROFILE_WALLET);
       return;
     }
@@ -224,6 +230,43 @@ export default function PartnerScreen() {
   const completeAfterTimeUp = async (job: Booking) => {
     dismissTimeUp();
     await advance(job, { confirmEarly: false });
+  };
+
+  /** Customer paid in cash: record it, celebrate, and the platform-fee card takes over. */
+  const collectCash = async (job: Booking) => {
+    if (cashBusyId) return;
+    setCashBusyId(job.id);
+    try {
+      const { booking } = await creatorApi.collectCash(job.id);
+      celebratePayment(booking);
+    } catch (err) {
+      toast.error((err as ApiFailure).message);
+      reload();
+    } finally {
+      setCashBusyId(null);
+    }
+  };
+
+  /** Pay SnapNear's platform share for a cash shoot; the card stays until this succeeds. */
+  const payPlatformFee = async (job: Booking) => {
+    if (feePayingId) return;
+    setFeePayingId(job.id);
+    try {
+      const { checkout } = await creatorApi.startPlatformFee(job.id);
+      const result = await openRazorpayCheckout(checkout, { onFailed: (msg) => toast.error(msg) });
+      if (!result) {
+        toast('Fee payment not completed. The fee card stays until you pay.', { icon: '⏳' });
+        return;
+      }
+      await creatorApi.verifyPlatformFee(job.id, result);
+      playChime('success');
+      toast.success(`Platform fee of ${formatINR(job.platformFee)} paid. ${job.code} is fully settled!`);
+      await reload();
+    } catch (err) {
+      toast.error((err as ApiFailure).message);
+    } finally {
+      setFeePayingId(null);
+    }
   };
 
   const confirmPartnerCancel = async (reason: string, remark: string) => {
@@ -346,8 +389,8 @@ export default function PartnerScreen() {
             <View className="min-w-0 flex-1 gap-2">
               <Text className="font-display text-sm font-bold text-red-700">Add your UPI ID to accept shoots</Text>
               <Text className="text-xs font-semibold leading-5 text-red-600">
-                Go to Earnings & Payouts and save your UPI ID first. You cannot accept a shoot until this is done.
-                You can update it anytime from Profile → Earnings & Payouts.
+                Go to Wallet and save your UPI ID first. You cannot accept a shoot until this is done.
+                You can update it anytime from Profile → Wallet.
               </Text>
               <Button
                 size="sm"
@@ -356,14 +399,18 @@ export default function PartnerScreen() {
                 className="self-start"
                 onPress={() => router.push(ROUTES.PROFILE_WALLET)}
               >
-                Open Earnings & Payouts
+                Open Wallet
               </Button>
             </View>
           </View>
         </Card>
       )}
 
-      {awaitingPayment.length > 0 && <CollectPaymentCard jobs={awaitingPayment} onShowQr={setQrJob} />}
+      <PlatformFeeCard jobs={platformFeeDue} payingId={feePayingId} onPay={payPlatformFee} />
+
+      {awaitingPayment.length > 0 && (
+        <CollectPaymentCard jobs={awaitingPayment} onShowQr={setQrJob} onCollectCash={collectCash} cashBusyId={cashBusyId} />
+      )}
 
       {activeJobs.map((job) => (
         <ActiveJobCard

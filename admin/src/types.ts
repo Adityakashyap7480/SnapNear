@@ -67,8 +67,10 @@ export interface Catalog {
 export interface Payment {
   status: 'due' | 'paid';
   method: string | null;
-  via: 'app' | 'qr' | null;
+  via: 'app' | 'qr' | 'cash' | null;
   paidAt: string | null;
+  platformFeeStatus?: 'due' | 'paid' | null;
+  platformFeePaidAt?: string | null;
 }
 
 export interface Booking {
@@ -192,8 +194,22 @@ export interface PayoutRecord {
   paidAt: string;
 }
 
+/** Partner tapped "Request Payout" in their Wallet; worked manually from the Payouts page. */
+export interface PayoutRequest {
+  id: string;
+  creatorId: string;
+  name: string;
+  phone: string;
+  email: string;
+  upiId: string;
+  amount: number;
+  status: 'pending' | 'paid';
+  createdAt: string;
+}
+
 export interface PayoutsData {
   holdDays: number;
+  requests: PayoutRequest[];
   summary: {
     owedToPartners: number;
     owedCount: number;
@@ -220,4 +236,7 @@ export interface AdminUpdate {
   startedAt?: string;
   endsAt?: string;
   durationMinutes?: number;
+  requestId?: string;
+  creatorId?: string;
+  amount?: number;
 }

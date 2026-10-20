@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { Banknote, Briefcase, ChevronDown, LogOut, PieChart, ShieldCheck, Users, Wifi, WifiOff } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Banknote, Bell, Briefcase, ChevronDown, LogOut, PieChart, ShieldCheck, Users, Wifi, WifiOff } from 'lucide-react';
 import Logo from '../components/ui/Logo';
 import Avatar from '../components/ui/Avatar';
+import AdminPayoutAlerts from '../components/admin/AdminPayoutAlerts';
 import AdminShootAlerts from '../components/admin/AdminShootAlerts';
+import { adminApi } from '../api/services';
+import useAdminLive from '../hooks/useAdminLive';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
 import { useSocket } from '../context/SocketContext';
@@ -60,6 +63,42 @@ function UserMenu({ user }: { user: User }) {
   );
 }
 
+/** Bell with a live badge for partner payout requests waiting on the Payouts page. */
+function PayoutBell() {
+  const navigate = useNavigate();
+  const [count, setCount] = useState(0);
+
+  const refresh = useCallback(() => {
+    adminApi
+      .payouts()
+      .then((d) => setCount(d.requests.length))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    const id = setInterval(refresh, 60_000);
+    return () => clearInterval(id);
+  }, [refresh]);
+  useAdminLive(refresh);
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(ROUTES.PAYOUTS)}
+      title={count > 0 ? `${count} payout request(s) waiting` : 'Payout requests'}
+      className="relative rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+    >
+      <Bell className="h-4 w-4" />
+      {count > 0 && (
+        <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function PortalLayout() {
   const { user } = useAuth();
   const { connected } = useSocket();
@@ -76,6 +115,7 @@ export default function PortalLayout() {
   return (
     <div className="flex min-h-screen flex-col">
       <AdminShootAlerts />
+      <AdminPayoutAlerts />
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
           <div className="min-w-0">
@@ -100,6 +140,7 @@ export default function PortalLayout() {
           </nav>
 
           <div className="flex shrink-0 items-center gap-2">
+            <PayoutBell />
             <span
               title={connected ? 'Live updates connected' : 'Reconnecting...'}
               className={`hidden items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold sm:flex ${

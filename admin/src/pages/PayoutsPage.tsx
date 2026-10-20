@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, Banknote, CheckCircle2, Copy, Hourglass, Landmark, Send, Smartphone, Wallet } from 'lucide-react';
+import { AlertTriangle, Banknote, CheckCircle2, Copy, HandCoins, Hourglass, Landmark, Send, Smartphone, Wallet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Card, { EmptyState, StatCard } from '../components/ui/Card';
 import Avatar from '../components/ui/Avatar';
@@ -38,7 +38,7 @@ function UpiLine({ partner }: { partner: PendingPayout }) {
     return (
       <p className="flex items-start gap-1.5 rounded-lg bg-red-50 p-2 text-[11px] text-red-700">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>UPI ID not added. Ask {partner.name.split(' ')[0]} to add it under Earnings & Payouts, or pay to {partner.phone}.</span>
+        <span>UPI ID not added. Ask {partner.name.split(' ')[0]} to add it under Wallet, or pay to {partner.phone}.</span>
       </p>
     );
   }
@@ -167,7 +167,8 @@ export default function PayoutsPage() {
 
   if (loading || !data) return <PageLoader label="Loading payouts..." />;
 
-  const { summary: s, partners, history, holdDays } = data;
+  const { summary: s, partners, requests, history, holdDays } = data;
+  const partnerForRequest = (creatorId: string) => partners.find((p) => p.creatorId === creatorId);
 
   return (
     <div className="space-y-6">
@@ -220,6 +221,48 @@ export default function PayoutsPage() {
           hint={`${s.payoutCount} transfer(s) • ${formatINR(s.dueFromCustomers)} awaiting customers`}
         />
       </div>
+
+      {requests.length > 0 && (
+        <Card className="border-teal-200 bg-teal-50/50 p-4 sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <h3 className="font-display text-base font-bold text-slate-900">Payout requests</h3>
+            <Badge tone="emerald" icon={HandCoins}>{requests.length} waiting</Badge>
+          </div>
+          <p className="-mt-2 mb-4 text-xs text-slate-500">
+            Partners who tapped &quot;Request Payout&quot; in their Wallet. Send the money by UPI, then mark it paid — their Wallet balance resets and they get an email.
+          </p>
+          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {requests.map((r) => {
+              const partner = partnerForRequest(r.creatorId);
+              return (
+                <li key={r.id} className="flex flex-col rounded-xl border border-teal-100 bg-white p-3.5">
+                  <div className="flex items-start gap-3">
+                    <Avatar name={r.name} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-slate-900">{r.name}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {r.phone} • requested {formatDateTime(r.createdAt)}
+                      </p>
+                    </div>
+                    <p className="font-display text-lg font-black text-slate-900">{formatINR(r.amount, { fixed: true })}</p>
+                  </div>
+                  <p className="mt-2 truncate text-[11px] text-slate-500">
+                    UPI: <span className="font-semibold text-slate-700">{r.upiId || 'Not added'}</span>
+                  </p>
+                  <Button
+                    variant="success"
+                    className="mt-3 w-full"
+                    disabled={!partner}
+                    onClick={() => partner && setTarget(partner)}
+                  >
+                    <Banknote className="h-4 w-4" /> {partner ? 'Send & Mark as Paid' : 'Nothing to pay'}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       <Card className="p-4 sm:p-6">
         <div className="mb-4">

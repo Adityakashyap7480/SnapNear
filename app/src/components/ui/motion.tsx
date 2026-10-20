@@ -88,17 +88,6 @@ export function PopIn({ children, className, style, delay = 0 }: MotionProps) {
   );
 }
 
-/** animate-float */
-export function Float({ children, className, style, delay }: MotionProps) {
-  const v = useLoop((a) => Animated.sequence([timing(a, 1, 3000, Easing.inOut(Easing.ease)), timing(a, 0, 3000, Easing.inOut(Easing.ease))]), { delay });
-  const translateY = v.interpolate({ inputRange: [0, 1], outputRange: [0, -10] });
-  return (
-    <Animated.View className={className} style={[style, { transform: [{ translateY }] }]}>
-      {children}
-    </Animated.View>
-  );
-}
-
 /** animate-sparkle */
 export function Sparkle({ children, className, style, delay }: MotionProps) {
   const v = useLoop((a) => Animated.sequence([timing(a, 1, 1200, Easing.inOut(Easing.ease)), timing(a, 0, 1200, Easing.inOut(Easing.ease))]), { delay });

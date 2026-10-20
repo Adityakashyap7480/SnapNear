@@ -286,5 +286,4 @@ export type CreatorProfile = typeof creatorProfiles.$inferSelect;
 export type NewCreatorProfile = typeof creatorProfiles.$inferInsert;
 export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;
-export type BookingRating = typeof bookingRatings.$inferSelect;
 export type Payout = typeof payouts.$inferSelect;

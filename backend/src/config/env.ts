@@ -159,5 +159,3 @@ if (missing.length || invalid.length) {
   ];
   throw new Error(`Fix these environment variables in backend/.env (or on the host):\n  - ${lines.join('\n  - ')}`);
 }
-
-export type Env = typeof env;

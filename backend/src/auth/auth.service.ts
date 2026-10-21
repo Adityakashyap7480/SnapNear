@@ -19,6 +19,7 @@ import { env } from '../config/env.js';
 import { ADMIN_EVENTS } from '../constants/events.js';
 import { ACCOUNT_STATUS, ACTIVE_JOB_STATUSES, BOOKING_STATUS, ROLES, type BookingStatus } from '../constants/roles.js';
 import {
+  accountDeletions,
   bookingDeclines,
   bookingRatings,
   bookings,
@@ -362,6 +363,11 @@ export class AuthService {
 
     const deletedEmail = `deleted-${user.id}@deleted.snapnear.in`;
     await this.db.transaction(async (tx) => {
+      // Kept before the scrub so the Super Admin can still see who deleted.
+      await tx
+        .insert(accountDeletions)
+        .values({ userId: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role })
+        .onConflictDoNothing();
       await tx.delete(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
       await tx.delete(deviceTokens).where(eq(deviceTokens.userId, user.id));
       await tx.delete(bookingDeclines).where(eq(bookingDeclines.creatorId, user.id));
@@ -404,6 +410,7 @@ export class AuthService {
         })
         .where(eq(users.id, user.id));
     });
+    this.realtime.notifyAdmins(ADMIN_EVENTS.USER_DELETED, { userId: user.id, role: user.role });
     return { success: true };
   }
 

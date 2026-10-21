@@ -32,6 +32,7 @@ export const BOOKING_EVENT_BY_STATUS: Partial<Record<BookingStatus, BookingEvent
 /** Admin-only activity, sent as `payload.event` on SOCKET_EVENTS.ADMIN_UPDATE. */
 export const ADMIN_EVENTS = Object.freeze({
   USER_NEW: 'user:new',
+  USER_DELETED: 'user:deleted',
   USER_STATUS: 'user:status',
   CREATOR_DUTY: 'creator:duty',
   PAYOUT_PAID: 'payout:paid',

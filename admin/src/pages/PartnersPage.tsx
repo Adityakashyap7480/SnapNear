@@ -173,7 +173,7 @@ export default function PartnersPage() {
                 <div className="min-h-3 flex-1" />
                 <div className="flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
                   <div className="min-w-0">
-                    <AccountStatusBadge status={c.accountStatus} reason={c.statusReason} />
+                    <AccountStatusBadge status={c.accountStatus} reason={c.statusReason} deletedAt={c.deletedAt} />
                     {c.statusReason && <p className="mt-1 truncate text-[10px] text-slate-500">Reason: {c.statusReason}</p>}
                   </div>
                   <AccountActions user={c} kind="partner" onChanged={reload} />
@@ -245,7 +245,7 @@ export default function PartnersPage() {
                     <td className="px-3 py-3">{formatDate(c.joinedAt)}</td>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
-                        <AccountStatusBadge status={c.accountStatus} reason={c.statusReason} />
+                        <AccountStatusBadge status={c.accountStatus} reason={c.statusReason} deletedAt={c.deletedAt} />
                         <AccountActions user={c} kind="partner" onChanged={reload} />
                       </div>
                     </td>

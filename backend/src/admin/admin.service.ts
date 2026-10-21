@@ -15,7 +15,7 @@ import {
 } from '../constants/roles.js';
 import { countOf, likePattern, maxOf, sumOf } from '../database/aggregates.js';
 import { DatabaseService } from '../database/database.service.js';
-import { bookings, creatorProfiles, users } from '../database/schema.js';
+import { accountDeletions, bookings, creatorProfiles, users } from '../database/schema.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { BookingsRepository } from '../repositories/bookings.repository.js';
 import { type User, UsersRepository } from '../repositories/users.repository.js';
@@ -175,9 +175,16 @@ export class AdminService {
     };
   }
 
+  /** userId -> deletion record, so scrubbed rows still show the real name to admins. */
+  private async deletionMap() {
+    const rows = await this.db.select().from(accountDeletions);
+    return Object.fromEntries(rows.map((d) => [d.userId, d]));
+  }
+
   async listClients() {
-    const [clients, stats] = await Promise.all([
+    const [clients, deletions, stats] = await Promise.all([
       this.users.listWithProfiles(eq(users.role, ROLES.CLIENT), desc(users.createdAt)),
+      this.deletionMap(),
       this.db
         .select({
           clientId: bookings.clientId,
@@ -196,13 +203,15 @@ export class AdminService {
       success: true,
       clients: clients.map((c) => {
         const s = statMap[c.id];
+        const d = deletions[c.id];
         return {
           id: c.id,
-          name: c.name,
+          name: d?.name ?? c.name,
           email: c.email,
           phone: c.phone,
           city: c.city,
           joinedAt: c.createdAt,
+          deletedAt: d?.deletedAt ?? null,
           bookings: s?.bookings || 0,
           completed: s?.completed || 0,
           active: s?.active || 0,
@@ -215,7 +224,7 @@ export class AdminService {
   }
 
   async listCreators() {
-    const [creators, stats] = await Promise.all([
+    const [creators, stats, deletions] = await Promise.all([
       this.users.listWithProfiles(eq(users.role, ROLES.CREATOR), desc(users.createdAt)),
       this.db
         .select({
@@ -229,6 +238,7 @@ export class AdminService {
         .from(bookings)
         .where(isNotNull(bookings.creatorId))
         .groupBy(bookings.creatorId),
+      this.deletionMap(),
     ]);
 
     const statMap = Object.fromEntries(stats.map((s) => [s.creatorId, s]));
@@ -236,13 +246,15 @@ export class AdminService {
       success: true,
       creators: creators.map((c) => {
         const s = statMap[c.id];
+        const d = deletions[c.id];
         return {
           id: c.id,
-          name: c.name,
+          name: d?.name ?? c.name,
           email: c.email,
           phone: c.phone,
           city: c.city,
           joinedAt: c.createdAt,
+          deletedAt: d?.deletedAt ?? null,
           services: c.creatorProfile?.services || [],
           experienceYears: c.creatorProfile?.experienceYears || 0,
           gear: c.creatorProfile?.gear || '',

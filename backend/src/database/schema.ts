@@ -144,6 +144,28 @@ export const payoutRequests = pgTable(
   ]
 );
 
+/**
+ * One row per self-deleted account. Deletion scrubs the users row, so this audit
+ * trail is the only place the Super Admin can still see WHO deleted their account.
+ */
+export const accountDeletions = pgTable(
+  'account_deletions',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .unique()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    email: text('email').notNull(),
+    phone: text('phone').notNull(),
+    role: userRole('role').notNull(),
+    deletedAt: ts('deleted_at').notNull().defaultNow(),
+    ...timestamps(),
+  },
+  (t) => [index('account_deletions_deleted_idx').on(t.deletedAt)]
+);
+
 export const bookings = pgTable(
   'bookings',
   {

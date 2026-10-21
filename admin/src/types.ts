@@ -128,6 +128,8 @@ interface AccountFields {
   accountStatus: AccountStatus;
   statusReason: string;
   statusChangedAt: string | null;
+  /** Set when the user deleted their own account; name shown is the pre-deletion one. */
+  deletedAt: string | null;
 }
 
 export interface AdminCustomer extends AccountFields {

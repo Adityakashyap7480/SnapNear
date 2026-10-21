@@ -30,7 +30,7 @@ export default function DeleteAccountModal({ deleting, onConfirm, onClose }: Pro
         <PopIn className="w-full max-w-sm rounded-3xl bg-white p-6" style={shadows['2xl']}>
           <View className="items-center">
             <Trash2 size={60} color={colors.red[500]} strokeWidth={1.5} />
-            <Text className="mt-4 text-center font-display text-xl font-extrabold leading-7 text-slate-900">
+            <Text className="mt-4 text-center text-xl font-bold leading-7 text-slate-900">
               Are you sure you want to delete your account?
             </Text>
             <Text className="mt-3 text-center text-sm leading-5 text-slate-500">

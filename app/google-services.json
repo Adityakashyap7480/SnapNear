@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "693386032307",
+    "project_id": "snapnear-66c16",
+    "storage_bucket": "snapnear-66c16.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:693386032307:android:b3e62d3e9738ce731aacc6",
+        "android_client_info": {
+          "package_name": "in.snapnear.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIpf52AmUmwyBEpSzGebA2eM4yhbpRgeA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

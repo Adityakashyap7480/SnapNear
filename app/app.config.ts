@@ -36,6 +36,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   android: {
     package: env.ANDROID_PACKAGE || 'in.snapnear.app',
+    // FCM push for the standalone APK (expo-notifications reads this at build time)
+    googleServicesFile: './google-services.json',
     adaptiveIcon: {
       foregroundImage: './assets/android-icon-foreground.png',
       backgroundColor: '#ff8008',

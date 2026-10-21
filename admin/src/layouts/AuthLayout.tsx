@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { BadgeCheck, Bell, Camera, IndianRupee, MapPin, ShieldCheck, Star, Video, Zap } from 'lucide-react';
+import { warmUpServer } from '../api/client';
 import Logo from '../components/ui/Logo';
 import { useCatalog } from '../context/CatalogContext';
 import { formatINR } from '../utils/format';
@@ -54,6 +55,11 @@ function FloatingPartnerCard() {
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   const { startingPrice } = useCatalog();
+
+  // Wake the (possibly sleeping) backend now, so login isn't the request that has to.
+  useEffect(() => {
+    warmUpServer();
+  }, []);
   const features = [
     { icon: Zap, title: 'Instant doorstep dispatch', text: 'Verified photographers within 10 km get your request in seconds.' },
     { icon: ShieldCheck, title: 'Verified & experienced', text: 'Every SnapNear Partner is background-checked.' },

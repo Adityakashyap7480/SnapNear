@@ -13,7 +13,8 @@ export type SignupOtpResponse = {
 };
 
 export const authApi = {
-  login: (data: { email: string; password: string }) => request<Session>('POST', '/auth/login', { data }),
+  login: (data: { email: string; password: string }) =>
+    request<Session>('POST', '/auth/login', { data, retryOnColdStart: true }),
   signup: (data: Record<string, unknown>) => request<Session>('POST', '/auth/signup', { data }),
   requestSignupOtp: (data: Record<string, unknown>) =>
     request<SignupOtpResponse>('POST', '/auth/signup/request-otp', { data }),

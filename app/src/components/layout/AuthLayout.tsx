@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Image, KeyboardAvoidingView, Platform, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IndianRupee, ShieldCheck, Zap } from 'lucide-react-native';
@@ -7,6 +7,7 @@ import GradientText from '../ui/GradientText';
 import GridPattern from '../ui/GridPattern';
 import Text from '../ui/Text';
 import { FadeUp, Pulse } from '../ui/motion';
+import { warmUpServer } from '../../api/client';
 import { colors } from '../../theme/colors';
 import { formatINR } from '../../utils/format';
 
@@ -138,6 +139,11 @@ export default function AuthLayout({
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const wide = width >= 1024;
+
+  // Wake the (possibly sleeping) backend now, so login isn't the request that has to.
+  useEffect(() => {
+    warmUpServer();
+  }, []);
 
   return (
     <View className="flex-1 flex-row bg-white">

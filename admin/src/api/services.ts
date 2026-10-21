@@ -16,7 +16,8 @@ import type {
 const byId = (id: string) => ({ pathParams: { id } });
 
 export const authApi = {
-  login: (data: { email: string; password: string }) => request<Session>('POST', '/auth/login', { data }),
+  login: (data: { email: string; password: string }) =>
+    request<Session>('POST', '/auth/login', { data, retryOnColdStart: true }),
   me: () => request<{ user: User }>('GET', '/auth/me'),
 };
 

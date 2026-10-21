@@ -1,14 +1,19 @@
 import { useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
-import { CalendarDays, ChevronRight, CircleHelp, LogOut, Wallet } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, CircleHelp, LogOut, Trash2, Wallet } from 'lucide-react-native';
 import EditProfileModal from '../components/profile/EditProfileModal';
 import Avatar from '../components/ui/Avatar';
+import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
 import Text from '../components/ui/Text';
 import { SUPPORT_EMAIL, ROLES } from '../config/constants';
 import { ROUTES } from '../config/routes';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
+import { authApi } from '../api/services';
+import toast from '../lib/toast';
+import type { ApiFailure } from '../types';
 import { colors } from '../theme/colors';
 import { shadows } from '../theme/shadows';
 function Tile({
@@ -45,7 +50,23 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { partnerPct } = useCatalog();
   const [editOpen, setEditOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   if (!user) return null;
+
+  const deleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await authApi.deleteAccount();
+      toast.success('Your account and personal data have been deleted.');
+      setDeleteOpen(false);
+      logout();
+    } catch (err) {
+      toast.error((err as ApiFailure).message);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const isPartner = user.role === ROLES.CREATOR;
   const support = SUPPORT_EMAIL;
@@ -101,6 +122,40 @@ export default function ProfileScreen() {
         <LogOut size={16} color={colors.red[600]} />
         <Text className="text-sm font-semibold text-red-600">Log out</Text>
       </Pressable>
+
+      <Pressable
+        testID="profile-delete-account"
+        accessibilityRole="button"
+        onPress={() => setDeleteOpen(true)}
+        className="items-center py-1 active:opacity-70"
+      >
+        <Text className="text-xs font-semibold text-slate-400 underline">Delete my account</Text>
+      </Pressable>
+
+      <Modal
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Delete your account?"
+        description="This permanently deletes your SnapNear account and personal data. Past booking and payment records are kept without your name or contact details, as the law requires."
+        icon={Trash2}
+        iconBox="bg-red-100"
+        iconColor="#b91c1c"
+        footer={
+          <>
+            <Button variant="ghost" onPress={() => setDeleteOpen(false)} disabled={deleting}>
+              Keep my account
+            </Button>
+            <Button variant="danger" icon={Trash2} loading={deleting} onPress={deleteAccount}>
+              Delete permanently
+            </Button>
+          </>
+        }
+      >
+        <Text className="text-xs leading-5 text-slate-500">
+          You will be logged out immediately and this cannot be undone. If you are a partner, withdraw any
+          Wallet balance first — pending payouts cannot be processed after deletion.
+        </Text>
+      </Modal>
 
       <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} />
     </View>

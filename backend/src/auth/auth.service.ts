@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import { ApiError } from '../common/api-error.js';
 import { assertAccountActive } from '../common/account-status.js';
 import type {
@@ -17,8 +17,18 @@ import type {
 } from '../common/validation.js';
 import { env } from '../config/env.js';
 import { ADMIN_EVENTS } from '../constants/events.js';
-import { ROLES } from '../constants/roles.js';
-import { signupOtps, users } from '../database/schema.js';
+import { ACCOUNT_STATUS, ACTIVE_JOB_STATUSES, BOOKING_STATUS, ROLES, type BookingStatus } from '../constants/roles.js';
+import {
+  bookingDeclines,
+  bookingRatings,
+  bookings,
+  creatorProfiles,
+  deviceTokens,
+  payoutRequests,
+  payouts,
+  signupOtps,
+  users,
+} from '../database/schema.js';
 import { DatabaseService } from '../database/database.service.js';
 import { RealtimeGateway } from '../realtime/realtime.gateway.js';
 import { type User, UsersRepository, toPublicUser } from '../repositories/users.repository.js';
@@ -60,6 +70,10 @@ export class AuthService {
     private readonly mail: MailService,
     private readonly database: DatabaseService
   ) {}
+
+  private get db() {
+    return this.database.db;
+  }
 
   /** Used by signup (Book a shoot + Partner) before opening Google. */
   async checkEmail(email: string) {
@@ -319,6 +333,78 @@ export class AuthService {
         : changes;
     const updated = await this.users.update(user, withLocation);
     return { success: true, user: toPublicUser(updated) };
+  }
+
+  /**
+   * Account deletion (Play Store requirement). Bookings/payouts rows reference the
+   * user with ON DELETE RESTRICT and hold money records we must retain, so instead
+   * of removing the row we destroy the identity: every name, contact and credential
+   * is scrubbed, the partner profile and device tokens are deleted, and the account
+   * is locked. The freed email can sign up again as a brand-new account.
+   */
+  async deleteAccount(user: User) {
+    const openStatuses: BookingStatus[] = [BOOKING_STATUS.SEARCHING, ...ACTIVE_JOB_STATUSES];
+    const [active] = await this.db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(
+        and(
+          or(eq(bookings.clientId, user.id), eq(bookings.creatorId, user.id)),
+          inArray(bookings.status, openStatuses)
+        )
+      )
+      .limit(1);
+    if (active) {
+      throw ApiError.conflict(
+        'You have an active booking. Complete or cancel it before deleting your account.'
+      );
+    }
+
+    const deletedEmail = `deleted-${user.id}@deleted.snapnear.in`;
+    await this.db.transaction(async (tx) => {
+      await tx.delete(creatorProfiles).where(eq(creatorProfiles.userId, user.id));
+      await tx.delete(deviceTokens).where(eq(deviceTokens.userId, user.id));
+      await tx.delete(bookingDeclines).where(eq(bookingDeclines.creatorId, user.id));
+      await tx
+        .delete(bookingRatings)
+        .where(or(eq(bookingRatings.clientId, user.id), eq(bookingRatings.creatorId, user.id)));
+      await tx.delete(signupOtps).where(eq(signupOtps.email, user.email));
+      await tx
+        .delete(payoutRequests)
+        .where(and(eq(payoutRequests.creatorId, user.id), eq(payoutRequests.status, 'pending')));
+      await tx
+        .update(bookings)
+        .set({ clientName: 'Deleted User', clientPhone: '', clientEmail: deletedEmail })
+        .where(eq(bookings.clientId, user.id));
+      await tx
+        .update(bookings)
+        .set({ creatorName: 'Deleted User', creatorPhone: '', creatorEmail: deletedEmail })
+        .where(eq(bookings.creatorId, user.id));
+      await tx
+        .update(payouts)
+        .set({ creatorName: 'Deleted User', creatorPhone: '', creatorUpiId: '' })
+        .where(eq(payouts.creatorId, user.id));
+      await tx
+        .update(users)
+        .set({
+          name: 'Deleted User',
+          email: deletedEmail,
+          phone: '',
+          passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10),
+          city: '',
+          address: '',
+          latitude: null,
+          longitude: null,
+          locationUpdatedAt: null,
+          passwordResetTokenHash: null,
+          passwordResetExpiresAt: null,
+          accountStatus: ACCOUNT_STATUS.BLOCKED,
+          statusReason: 'Account deleted by user',
+          statusChangedAt: new Date(),
+        })
+        .where(eq(users.id, user.id));
+    });
+    return { success: true };
   }
 
   async forgotPassword({ email }: ForgotPasswordInput) {

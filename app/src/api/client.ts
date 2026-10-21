@@ -44,7 +44,7 @@ apiClient.interceptors.response.use(
   }
 );
 
-type Method = 'GET' | 'POST' | 'PATCH';
+type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 
 interface RequestOptions {
   pathParams?: Record<string, string>;

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post } from '@nestjs/common';
 import { ZodPipe } from '../common/zod.pipe.js';
 import {
   type CheckEmailInput,
@@ -106,6 +106,14 @@ export class AuthController {
   @Auth(ROLES.CLIENT, ROLES.CREATOR)
   updateMe(@CurrentUser() current: AppUser, @Body(new ZodPipe(updateMeSchema)) body: UpdateMeInput) {
     return this.auth.updateMe(current.doc, body);
+  }
+
+  /** Permanent account deletion: scrubs personal data and locks the account. */
+  @Delete('me')
+  @Auth(ROLES.CLIENT, ROLES.CREATOR)
+  @HttpCode(200)
+  deleteMe(@CurrentUser() current: AppUser) {
+    return this.auth.deleteAccount(current.doc);
   }
 
   /** Register this device for background shoot alerts (Android/iOS badge + banner). */

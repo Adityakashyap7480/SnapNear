@@ -39,6 +39,7 @@ export const authApi = {
     latitude?: number;
     longitude?: number;
   }) => request<{ user: User }>('PATCH', '/auth/me', { data }),
+  deleteAccount: () => request<{ success: boolean }>('DELETE', '/auth/me'),
   registerPushToken: (data: { token: string; platform: 'android' | 'ios' | 'web' | 'unknown' }) =>
     request<{ success: boolean }>('POST', '/auth/push-token', { data }),
   clearPushToken: (data: { token?: string } = {}) => request<{ success: boolean }>('POST', '/auth/push-token/clear', { data }),

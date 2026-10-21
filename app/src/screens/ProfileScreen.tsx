@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
-import { CalendarDays, ChevronRight, CircleHelp, LogOut, Trash2, Wallet } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, CircleHelp, LogOut, Wallet } from 'lucide-react-native';
+import DeleteAccountModal from '../components/profile/DeleteAccountModal';
 import EditProfileModal from '../components/profile/EditProfileModal';
 import Avatar from '../components/ui/Avatar';
-import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
 import Text from '../components/ui/Text';
 import { SUPPORT_EMAIL, ROLES } from '../config/constants';
 import { ROUTES } from '../config/routes';
@@ -132,30 +131,9 @@ export default function ProfileScreen() {
         <Text className="text-xs font-semibold text-slate-400 underline">Delete my account</Text>
       </Pressable>
 
-      <Modal
-        open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        title="Delete your account?"
-        description="This permanently deletes your SnapNear account and personal data. Past booking and payment records are kept without your name or contact details, as the law requires."
-        icon={Trash2}
-        iconBox="bg-red-100"
-        iconColor="#b91c1c"
-        footer={
-          <>
-            <Button variant="ghost" onPress={() => setDeleteOpen(false)} disabled={deleting}>
-              Keep my account
-            </Button>
-            <Button variant="danger" icon={Trash2} loading={deleting} onPress={deleteAccount}>
-              Delete permanently
-            </Button>
-          </>
-        }
-      >
-        <Text className="text-xs leading-5 text-slate-500">
-          You will be logged out immediately and this cannot be undone. If you are a partner, withdraw any
-          Wallet balance first — pending payouts cannot be processed after deletion.
-        </Text>
-      </Modal>
+      {deleteOpen && (
+        <DeleteAccountModal deleting={deleting} onConfirm={deleteAccount} onClose={() => setDeleteOpen(false)} />
+      )}
 
       <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} />
     </View>

@@ -29,7 +29,7 @@
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "476462008168-pt4pfus3ri2i4vcbh4u9086fnnlvfe2u.apps.googleusercontent.com"
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       }
     }
   },

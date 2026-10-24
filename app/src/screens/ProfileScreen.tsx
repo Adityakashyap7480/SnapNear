@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Linking, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
-import { CalendarDays, ChevronRight, CircleHelp, LogOut, Wallet } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, CircleHelp, FileText, LogOut, Mail, Shield, Wallet } from 'lucide-react-native';
 import DeleteAccountModal from '../components/profile/DeleteAccountModal';
 import EditProfileModal from '../components/profile/EditProfileModal';
 import Avatar from '../components/ui/Avatar';
@@ -108,6 +108,27 @@ export default function ProfileScreen() {
           icon={CircleHelp}
           title="Help & Support"
           subtitle="Get quick help"
+          onPress={() => router.push(ROUTES.SUPPORT)}
+        />
+        <Tile
+          icon={Shield}
+          title="Privacy"
+          subtitle="How we use data"
+          onPress={() => router.push(ROUTES.PRIVACY)}
+        />
+      </View>
+
+      <View className="flex-row gap-3">
+        <Tile
+          icon={FileText}
+          title="Terms"
+          subtitle="Terms of Service"
+          onPress={() => router.push(ROUTES.TERMS)}
+        />
+        <Tile
+          icon={Mail}
+          title="Email support"
+          subtitle={support}
           onPress={() => Linking.openURL(`mailto:${support}?subject=${encodeURIComponent('SnapNear support')}`)}
         />
       </View>

@@ -133,7 +133,7 @@ export default function SignupScreen() {
     else if (!/[A-Za-z]/.test(form.password) || !/\d/.test(form.password)) next.password = 'Use a mix of letters and numbers';
     if (form.confirmPassword !== form.password) next.confirmPassword = 'Passwords do not match';
     if (isCreator && form.services.length === 0) next.services = 'Select at least one service';
-    if (!form.agree) next.agree = 'Please accept the terms to continue';
+    if (!form.agree) next.agree = 'Confirm you are 18+ and accept the terms to continue';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -447,8 +447,22 @@ export default function SignupScreen() {
         <View className="pt-1">
           <Checkbox name="agree" checked={form.agree} onChange={(v) => set('agree', v)}>
             <Text className="text-xs text-slate-600">
-              I agree to SnapNear&apos;s <Text className="text-xs font-semibold text-slate-900">Terms of Service</Text> and{' '}
-              <Text className="text-xs font-semibold text-slate-900">Privacy Policy</Text>
+              I confirm I am 18+ and agree to SnapNear&apos;s{' '}
+              <Text
+                accessibilityRole="link"
+                className="text-xs font-semibold text-orange-600"
+                onPress={() => router.push(ROUTES.TERMS)}
+              >
+                Terms of Service
+              </Text>{' '}
+              and{' '}
+              <Text
+                accessibilityRole="link"
+                className="text-xs font-semibold text-orange-600"
+                onPress={() => router.push(ROUTES.PRIVACY)}
+              >
+                Privacy Policy
+              </Text>
               {isCreator && `, including the ${partnerPct} partner / ${platformPct} platform payout model`}.
             </Text>
           </Checkbox>

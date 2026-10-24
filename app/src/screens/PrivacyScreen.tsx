@@ -29,7 +29,7 @@ export default function PrivacyScreen() {
 
       <View className="gap-1">
         <Text className="font-display text-2xl font-black text-slate-900">Privacy Policy</Text>
-        <Text className="text-xs text-slate-500">Last updated: 21 October 2026</Text>
+        <Text className="text-xs text-slate-500">Last updated: 24 October 2026</Text>
       </View>
 
       <Section title="Who we are">
@@ -45,11 +45,11 @@ export default function PrivacyScreen() {
       </Section>
 
       <Section title="What we share">
-        {`With the other side of your booking only what a shoot needs: first name, phone number and the shoot address. With service providers who help us operate (Razorpay for payments, hosting, email and push providers) under their own security obligations. And when the law requires it. Nothing else.`}
+        {`With the other side of your booking only what a shoot needs: first name, phone number and the shoot address. With service providers who help us operate — Razorpay (payments), our hosting provider, email delivery, Firebase Cloud Messaging (push), and OpenStreetMap Nominatim when we reverse-geocode a pin to an address — under their own security obligations. And when the law requires it. Nothing else.`}
       </Section>
 
       <Section title="Location">
-        {`Location is used only to find shoots and partners near you and while a partner is on duty. You can switch it off in your device settings at any time; matching simply will not work without it.`}
+        {`Location is used only to find shoots and partners near you and while a partner is on duty. Coordinates may be sent to OpenStreetMap Nominatim to show a readable address. You can switch location off in your device settings at any time; matching simply will not work without it.`}
       </Section>
 
       <Section title="How long we keep it">

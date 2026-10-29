@@ -27,7 +27,7 @@ export function ProtectedRoute() {
 export function GuestRoute() {
   const { user, initializing } = useAuth();
   if (initializing) return <PageLoader />;
-  if (user?.role === ROLES.SUPER_ADMIN) return <Navigate to={ROUTES.PLATFORM} replace />;
+  if (user?.role === ROLES.SUPER_ADMIN) return <Navigate to={ROUTES.CUSTOMERS} replace />;
   if (user) return <LeaveForApp role={user.role} />;
   return <Outlet />;
 }

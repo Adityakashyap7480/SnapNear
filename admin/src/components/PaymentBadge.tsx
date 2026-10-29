@@ -24,7 +24,7 @@ export default function PaymentBadge({ payment }: { payment: Payment | null }) {
   }
 
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
+    <span className="flex flex-col items-start gap-1">
       <Badge tone="emerald" icon={Banknote} ring>
         Paid · Cash
       </Badge>

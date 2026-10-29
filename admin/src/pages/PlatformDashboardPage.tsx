@@ -64,7 +64,6 @@ export default function PlatformDashboardPage() {
         eyebrow={`Platform ${platformPct}`}
         title="Platform Financial Dashboard"
         subtitle={`Your ${platformPct} platform fee vs ${partnerPct} partner payouts across every customer booking, live.`}
-        onRefresh={() => reload()}
       />
 
       <LiveShootsCard shoots={o.liveShoots} />

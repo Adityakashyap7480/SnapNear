@@ -2,9 +2,11 @@ import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nes
 import { Auth } from '../auth/auth.guard.js';
 import {
   type AdminBookingQuery,
+  type AdminListQuery,
   type MarkPayoutInput,
   type UpdateUserStatusInput,
   adminBookingQuerySchema,
+  adminListQuerySchema,
   markPayoutSchema,
   updateUserStatusSchema,
 } from '../common/validation.js';
@@ -37,13 +39,13 @@ export class AdminController {
   }
 
   @Get('clients')
-  listClients() {
-    return this.admin.listClients();
+  listClients(@Query(new ZodPipe(adminListQuerySchema)) query: AdminListQuery) {
+    return this.admin.listClients(query);
   }
 
   @Get('creators')
-  listCreators() {
-    return this.admin.listCreators();
+  listCreators(@Query(new ZodPipe(adminListQuerySchema)) query: AdminListQuery) {
+    return this.admin.listCreators(query);
   }
 
   @Patch('users/:id/status')

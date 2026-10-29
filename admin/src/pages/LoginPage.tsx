@@ -47,7 +47,7 @@ export default function LoginPage() {
       toast.success(`Welcome back, ${user.name.split(' ')[0]}!`);
       if (user.role === ROLES.SUPER_ADMIN) {
         const from = (location.state as { from?: string } | null)?.from;
-        navigate(from && from !== ROUTES.LOGIN ? from : ROUTES.PLATFORM, { replace: true });
+        navigate(from && from !== ROUTES.LOGIN ? from : ROUTES.CUSTOMERS, { replace: true });
       } else {
         window.location.replace(APP_HOME[user.role]);
       }

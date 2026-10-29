@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, ChevronLeft, ChevronRight, Receipt, ShieldCheck, X } from 'lucide-react';
+import { ArrowRight, Receipt, ShieldCheck, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Card, { EmptyState } from '../ui/Card';
 import StatusBadge from '../ui/StatusBadge';
 import Spinner from '../ui/Spinner';
 import PaymentBadge from '../PaymentBadge';
 import { SearchInput } from '../ui/FormField';
+import TablePagination, { type PageSize } from '../ui/TablePagination';
 import { adminApi } from '../../api/services';
 import { useCatalog } from '../../context/CatalogContext';
 import useAdminLive from '../../hooks/useAdminLive';
+import useDebouncedValue from '../../hooks/useDebouncedValue';
 import { BOOKING_FILTER, type BookingFilter } from '../../config/constants';
 import type { ApiFailure, Booking, Pagination } from '../../types';
 import { isActive, isCompleted, isSearching } from '../../utils/bookingStatus';
@@ -17,9 +19,15 @@ import { formatDate, formatDateTime, formatINR, formatTime } from '../../utils/f
 function OtpStartNote({ booking }: { booking: Booking }) {
   if (!booking.startedAt) return null;
   return (
-    <p className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap text-emerald-700" title="Shoot started when the partner entered the customer's OTP">
-      <ShieldCheck className="h-3 w-3" /> OTP start {formatTime(booking.startedAt)}
-      {booking.endsAt && <span className="font-normal text-slate-400">&bull; ends {formatTime(booking.endsAt)}</span>}
+    <p
+      className="mt-0.5 flex items-center gap-1 text-[10px] leading-snug font-semibold text-emerald-700"
+      title="Shoot started when the partner entered the customer's OTP"
+    >
+      <ShieldCheck className="h-3 w-3 shrink-0" />
+      <span>
+        OTP {formatTime(booking.startedAt)}
+        {booking.endsAt && <span className="font-normal text-slate-400"> · ends {formatTime(booking.endsAt)}</span>}
+      </span>
     </p>
   );
 }
@@ -42,7 +50,7 @@ interface BookingsLedgerProps {
   subtitle?: string;
   initialStatus?: BookingFilter;
   tabs?: LedgerTab[];
-  pageSize?: number;
+  pageSize?: PageSize;
 }
 
 export default function BookingsLedger({
@@ -50,30 +58,26 @@ export default function BookingsLedger({
   subtitle = 'Every booking: who booked (customer) and who shot it (partner)',
   initialStatus = BOOKING_FILTER.ALL,
   tabs = DEFAULT_TABS,
-  pageSize = 15,
+  pageSize = 20,
 }: BookingsLedgerProps) {
   const { partnerPct, platformPct } = useCatalog();
   const [status, setStatus] = useState<BookingFilter>(initialStatus);
   const [query, setQuery] = useState('');
-  const [debounced, setDebounced] = useState('');
+  const debounced = useDebouncedValue(query.trim());
   const [page, setPage] = useState(1);
-  const [result, setResult] = useState<{ bookings: Booking[]; pagination: Pick<Pagination, 'total' | 'pages'> }>({
+  const [limit, setLimit] = useState<PageSize>(pageSize);
+  const [result, setResult] = useState<{ bookings: Booking[]; pagination: Pagination }>({
     bookings: [],
-    pagination: { total: 0, pages: 1 },
+    pagination: { page: 1, limit: pageSize, total: 0, pages: 1 },
   });
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 300);
-    return () => clearTimeout(t);
-  }, [query]);
-
-  useEffect(() => setPage(1), [status, debounced]);
+  useEffect(() => setPage(1), [status, debounced, limit]);
 
   const load = async () => {
     try {
-      const res = await adminApi.bookings({ status, q: debounced, page, limit: pageSize });
+      const res = await adminApi.bookings({ status, q: debounced, page, limit });
       setResult(res);
     } catch (err) {
       toast.error((err as ApiFailure).message);
@@ -84,8 +88,8 @@ export default function BookingsLedger({
 
   useEffect(() => {
     setLoading(true);
-    load();
-  }, [status, debounced, page]); // eslint-disable-line react-hooks/exhaustive-deps
+    void load();
+  }, [status, debounced, page, limit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useAdminLive(() => load());
 
@@ -95,7 +99,7 @@ export default function BookingsLedger({
     try {
       await adminApi.cancelBooking(b.id);
       toast.success(`${b.code} cancelled`);
-      load();
+      void load();
     } catch (err) {
       toast.error((err as ApiFailure).message);
     } finally {
@@ -105,25 +109,32 @@ export default function BookingsLedger({
 
   const { bookings, pagination } = result;
 
-  const cancelButton = (b: Booking) =>
-    isActive(b.status) && (
-      <button
-        type="button"
-        onClick={() => cancel(b)}
-        disabled={cancellingId === b.id}
-        title="Cancel booking"
-        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-      >
-        <X className="h-3.5 w-3.5" />
-      </button>
-    );
+  const statusCell = (b: Booking) => (
+    <div className="flex items-start gap-1.5">
+      <div className="flex min-w-0 flex-col items-start gap-1">
+        <StatusBadge status={b.status} pulse={isSearching(b.status)} />
+        <PaymentBadge payment={b.payment} />
+      </div>
+      {isActive(b.status) && (
+        <button
+          type="button"
+          onClick={() => cancel(b)}
+          disabled={cancellingId === b.id}
+          title="Cancel booking"
+          className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <Card className="p-4 sm:p-6">
       <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
         <div>
           <h3 className="font-display text-base font-bold text-slate-900">{title}</h3>
-          <p className="text-xs text-slate-500">{subtitle}</p>
+          <p className="text-xs leading-snug text-slate-500">{subtitle}</p>
         </div>
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
           {tabs.length > 1 && (
@@ -166,40 +177,34 @@ export default function BookingsLedger({
                 <li key={b.id} className="rounded-xl border border-slate-200 p-3.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900">{b.code}</p>
-                      <p className="text-[11px] text-slate-500">
-                        {b.serviceLabel} ({b.durationLabel}) &bull; {b.occasion}
+                      <p className="text-sm leading-snug font-bold text-slate-900">{b.code}</p>
+                      <p className="text-[11px] leading-snug text-slate-500">
+                        {b.serviceLabel} ({b.durationLabel}) · {b.occasion}
                       </p>
-                      <p className="text-[10px] text-slate-400">
-                        Booked {formatDateTime(b.createdAt)} &bull; Shoot {formatDate(b.shootDate)}
+                      <p className="text-[10px] leading-snug text-slate-400">
+                        Booked {formatDateTime(b.createdAt)} · Shoot {formatDate(b.shootDate)}
                       </p>
                       <OtpStartNote booking={b} />
                     </div>
-                    <div className="flex shrink-0 items-start gap-1">
-                      <div className="flex flex-col items-end gap-1">
-                        <StatusBadge status={b.status} pulse={isSearching(b.status)} />
-                        <PaymentBadge payment={b.payment} />
-                      </div>
-                      {cancelButton(b)}
-                    </div>
+                    <div className="shrink-0">{statusCell(b)}</div>
                   </div>
 
                   <div className="mt-3 flex items-center gap-2 rounded-lg bg-slate-50 p-2.5 text-xs">
                     <div className="min-w-0 flex-1">
                       <p className="text-[10px] font-semibold text-slate-400 uppercase">Customer</p>
-                      <p className="truncate font-semibold text-slate-800">{b.client.name}</p>
-                      <p className="text-[10px] text-slate-400">{b.client.phone}</p>
+                      <p className="truncate leading-snug font-semibold text-slate-800">{b.client.name}</p>
+                      <p className="text-[10px] leading-snug text-slate-400">{b.client.phone}</p>
                     </div>
                     <ArrowRight className="h-3.5 w-3.5 shrink-0 text-slate-300" />
                     <div className="min-w-0 flex-1 text-right">
                       <p className="text-[10px] font-semibold text-slate-400 uppercase">Partner</p>
                       {b.creator ? (
                         <>
-                          <p className="truncate font-semibold text-slate-800">{b.creator.name}</p>
-                          <p className="text-[10px] text-slate-400">{b.creator.phone}</p>
+                          <p className="truncate leading-snug font-semibold text-slate-800">{b.creator.name}</p>
+                          <p className="text-[10px] leading-snug text-slate-400">{b.creator.phone}</p>
                         </>
                       ) : (
-                        <p className="text-[11px] text-slate-400 italic">
+                        <p className="text-[11px] italic text-slate-400">
                           {isSearching(b.status) ? 'Awaiting...' : '—'}
                         </p>
                       )}
@@ -232,31 +237,41 @@ export default function BookingsLedger({
       </div>
 
       <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 xl:block">
-        <table className="w-full min-w-[900px] text-left text-xs">
-          <thead className="bg-slate-100 text-[10px] font-semibold whitespace-nowrap text-slate-700 uppercase">
+        <table className="w-full table-fixed text-left text-xs">
+          <colgroup>
+            <col className="w-[11%]" />
+            <col className="w-[12%]" />
+            <col className="w-[12%]" />
+            <col className="w-[14%]" />
+            <col className="w-[12%]" />
+            <col className="w-[8%]" />
+            <col className="w-[9%]" />
+            <col className="w-[9%]" />
+            <col className="w-[13%]" />
+          </colgroup>
+          <thead className="bg-slate-100 text-[10px] font-semibold tracking-wide text-slate-700 uppercase">
             <tr>
-              <th className="p-3">Order ID</th>
-              <th className="p-3">Customer</th>
-              <th className="p-3">Partner (Photographer)</th>
-              <th className="p-3">Session</th>
-              <th className="p-3">Shoot Date</th>
-              <th className="p-3 text-right">Gross</th>
-              <th className="p-3 text-right text-emerald-700">Partner {partnerPct}</th>
-              <th className="p-3 text-right text-brand-orange">Platform {platformPct}</th>
-              <th className="p-3">Status</th>
-              <th className="p-3" />
+              <th className="px-3 py-3">Order ID</th>
+              <th className="px-3 py-3">Customer</th>
+              <th className="px-3 py-3">Partner</th>
+              <th className="px-3 py-3">Session</th>
+              <th className="px-3 py-3">Shoot Date</th>
+              <th className="px-3 py-3 text-right">Gross</th>
+              <th className="px-3 py-3 text-right text-emerald-700">Partner {partnerPct}</th>
+              <th className="px-3 py-3 text-right text-brand-orange">Platform {platformPct}</th>
+              <th className="px-3 py-3">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200 text-slate-600">
+          <tbody className="divide-y divide-slate-100 text-slate-600">
             {loading && bookings.length === 0 ? (
               <tr>
-                <td colSpan={10} className="p-10 text-center">
+                <td colSpan={9} className="p-10 text-center">
                   <Spinner className="mx-auto h-6 w-6 text-brand-orange" />
                 </td>
               </tr>
             ) : bookings.length === 0 ? (
               <tr>
-                <td colSpan={10}>
+                <td colSpan={9}>
                   <EmptyState icon={Receipt} title="No bookings found" description="Try a different filter or search term." />
                 </td>
               </tr>
@@ -264,53 +279,57 @@ export default function BookingsLedger({
               bookings.map((b) => {
                 const counted = isCompleted(b.status);
                 return (
-                  <tr key={b.id} className="transition hover:bg-slate-50">
-                    <td className="p-3">
-                      <p className="font-semibold text-slate-800">{b.code}</p>
-                      <p className="text-[10px] text-slate-400">{formatDateTime(b.createdAt)}</p>
+                  <tr key={b.id} className="align-middle transition hover:bg-slate-50/80">
+                    <td className="px-3 py-3.5 align-middle">
+                      <p className="truncate leading-snug font-semibold text-slate-800">{b.code}</p>
+                      <p className="mt-0.5 truncate text-[10px] leading-snug text-slate-400">{formatDateTime(b.createdAt)}</p>
                     </td>
-                    <td className="p-3">
-                      <p className="font-semibold text-slate-800">{b.client.name}</p>
-                      <p className="text-[10px] text-slate-400">{b.client.phone}</p>
+                    <td className="px-3 py-3.5 align-middle">
+                      <p className="truncate leading-snug font-semibold text-slate-800">{b.client.name}</p>
+                      <p className="mt-0.5 truncate text-[10px] leading-snug text-slate-400">{b.client.phone || '—'}</p>
                     </td>
-                    <td className="p-3">
+                    <td className="px-3 py-3.5 align-middle">
                       {b.creator ? (
                         <>
-                          <p className="font-semibold text-slate-800">{b.creator.name}</p>
-                          <p className="text-[10px] text-slate-400">{b.creator.phone}</p>
+                          <p className="truncate leading-snug font-semibold text-slate-800">{b.creator.name}</p>
+                          <p className="mt-0.5 truncate text-[10px] leading-snug text-slate-400">{b.creator.phone || '—'}</p>
                         </>
                       ) : (
-                        <span className="text-[11px] text-slate-400 italic">
+                        <span className="text-[11px] italic text-slate-400">
                           {isSearching(b.status) ? 'Awaiting partner...' : '—'}
                         </span>
                       )}
                     </td>
-                    <td className="p-3">
-                      <p className="text-slate-800">
+                    <td className="px-3 py-3.5 align-middle">
+                      <p className="truncate leading-snug text-slate-800">
                         {b.serviceLabel} ({b.durationLabel})
                       </p>
-                      <p className="max-w-[180px] truncate text-[10px] text-slate-400" title={b.address}>
+                      <p className="mt-0.5 truncate text-[10px] leading-snug text-slate-400" title={b.occasion}>
                         {b.occasion}
                       </p>
                     </td>
-                    <td className="p-3 whitespace-nowrap">
-                      {formatDate(b.shootDate)}
+                    <td className="px-3 py-3.5 align-middle">
+                      <p className="truncate leading-snug text-slate-800">{formatDate(b.shootDate)}</p>
                       <OtpStartNote booking={b} />
                     </td>
-                    <td className="p-3 text-right font-bold text-slate-900">{formatINR(b.total)}</td>
-                    <td className={`p-3 text-right font-semibold ${counted ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    <td className="px-3 py-3.5 align-middle text-right leading-snug font-bold whitespace-nowrap text-slate-900">
+                      {formatINR(b.total)}
+                    </td>
+                    <td
+                      className={`px-3 py-3.5 align-middle text-right leading-snug font-semibold whitespace-nowrap ${
+                        counted ? 'text-emerald-600' : 'text-slate-400'
+                      }`}
+                    >
                       {formatINR(b.creatorPayout, { fixed: true })}
                     </td>
-                    <td className={`p-3 text-right font-bold ${counted ? 'text-brand-orange' : 'text-slate-400'}`}>
+                    <td
+                      className={`px-3 py-3.5 align-middle text-right leading-snug font-bold whitespace-nowrap ${
+                        counted ? 'text-brand-orange' : 'text-slate-400'
+                      }`}
+                    >
                       {formatINR(b.platformFee, { fixed: true })}
                     </td>
-                    <td className="p-3">
-                      <div className="flex flex-col items-start gap-1">
-                        <StatusBadge status={b.status} pulse={isSearching(b.status)} />
-                        <PaymentBadge payment={b.payment} />
-                      </div>
-                    </td>
-                    <td className="p-3 text-right">{cancelButton(b)}</td>
+                    <td className="px-3 py-3.5 align-middle">{statusCell(b)}</td>
                   </tr>
                 );
               })
@@ -319,34 +338,16 @@ export default function BookingsLedger({
         </table>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-        <span>
-          {pagination.total} booking{pagination.total === 1 ? '' : 's'} &bull; Revenue counted on completed shoots only
-        </span>
-        {pagination.pages > 1 && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-50 disabled:opacity-40"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <span className="font-semibold text-slate-700">
-              {page} / {pagination.pages}
-            </span>
-            <button
-              type="button"
-              disabled={page >= pagination.pages}
-              onClick={() => setPage((p) => p + 1)}
-              className="rounded-lg border border-slate-200 p-1.5 hover:bg-slate-50 disabled:opacity-40"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-      </div>
+      <TablePagination
+        pagination={pagination}
+        onPageChange={setPage}
+        onLimitChange={(next) => {
+          setLimit(next);
+          setPage(1);
+        }}
+        label="bookings"
+      />
+      <p className="mt-1 text-[11px] text-slate-400">Revenue counted on completed shoots only.</p>
     </Card>
   );
 }

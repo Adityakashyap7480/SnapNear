@@ -18,9 +18,12 @@ interface AccountStatusBadgeProps {
 export default function AccountStatusBadge({ status = ACCOUNT_STATUS.ACTIVE, reason, deletedAt }: AccountStatusBadgeProps) {
   if (deletedAt) {
     return (
-      <Badge tone="red" dot="bg-red-700" ring title={`Account deleted by the user on ${formatDate(deletedAt)}`}>
-        Deleted · {formatDate(deletedAt)}
-      </Badge>
+      <span className="inline-flex flex-col items-start gap-0.5">
+        <Badge tone="red" dot="bg-red-700" ring title={`Account deleted by the user on ${formatDate(deletedAt)}`}>
+          Deleted
+        </Badge>
+        <span className="pl-0.5 text-[10px] leading-none text-slate-400">{formatDate(deletedAt)}</span>
+      </span>
     );
   }
   const s = STYLES[status] || STYLES[ACCOUNT_STATUS.ACTIVE];

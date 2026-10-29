@@ -18,7 +18,7 @@ export default function AppRoutes() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<PortalLayout />}>
-          <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.PLATFORM} replace />} />
+          <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.CUSTOMERS} replace />} />
           <Route path={ROUTES.CUSTOMERS} element={<CustomersPage />} />
           <Route path={ROUTES.PARTNERS} element={<PartnersPage />} />
           <Route path={ROUTES.PLATFORM} element={<PlatformDashboardPage />} />

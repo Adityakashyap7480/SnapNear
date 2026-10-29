@@ -138,6 +138,11 @@ export interface AdminCustomer extends AccountFields {
   email: string;
   phone: string;
   city: string;
+  /** Profile GPS or latest booking doorstep address. */
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  locationUpdatedAt: string | null;
   joinedAt: string;
   bookings: number;
   completed: number;
@@ -152,6 +157,11 @@ export interface AdminPartner extends AccountFields {
   email: string;
   phone: string;
   city: string;
+  /** Live partner GPS from the device. */
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  locationUpdatedAt: string | null;
   joinedAt: string;
   services: string[];
   experienceYears: number;

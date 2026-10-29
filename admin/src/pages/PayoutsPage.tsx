@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertTriangle, Banknote, CheckCircle2, Copy, HandCoins, Hourglass, Landmark, Send, Smartphone, Wallet } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Card, { EmptyState, StatCard } from '../components/ui/Card';
@@ -8,6 +8,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { Input } from '../components/ui/FormField';
 import { PageLoader } from '../components/ui/Spinner';
+import TablePagination, { type PageSize } from '../components/ui/TablePagination';
 import PageHeader from '../components/admin/PageHeader';
 import BookingsLedger from '../components/admin/BookingsLedger';
 import { adminApi } from '../api/services';
@@ -163,7 +164,19 @@ export default function PayoutsPage() {
   const { partnerPct, platformPct } = useCatalog();
   const { data, loading, reload } = useAsync(() => adminApi.payouts(), []);
   const [target, setTarget] = useState<PendingPayout | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyLimit, setHistoryLimit] = useState<PageSize>(20);
   useAdminLive(() => reload());
+
+  const historySlice = useMemo(() => {
+    const list = data?.history || [];
+    const pages = Math.max(1, Math.ceil(list.length / historyLimit));
+    const page = Math.min(historyPage, pages);
+    return {
+      rows: list.slice((page - 1) * historyLimit, page * historyLimit),
+      pagination: { page, limit: historyLimit, total: list.length, pages },
+    };
+  }, [data?.history, historyPage, historyLimit]);
 
   if (loading || !data) return <PageLoader label="Loading payouts..." />;
 
@@ -189,7 +202,6 @@ export default function PayoutsPage() {
         eyebrow="Payouts"
         title="Partner payouts"
         subtitle={`Customers pay SnapNear online. Partners get their ${partnerPct} by UPI from you, ${holdDays} days after each payment.`}
-        onRefresh={() => reload()}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -329,13 +341,13 @@ export default function PayoutsPage() {
         ) : (
           <>
             <ul className="divide-y divide-slate-100 md:hidden">
-              {history.map((h) => (
+              {historySlice.rows.map((h) => (
                 <li key={h.id} className="flex items-center justify-between gap-3 py-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-slate-900">{h.name}</p>
-                    <p className="truncate text-[11px] text-slate-500">
-                      {formatDateTime(h.paidAt)} &bull; {h.bookingCount} shoot(s)
-                      {h.reference ? ` • Ref ${h.reference}` : ''}
+                    <p className="truncate text-sm leading-snug font-bold text-slate-900">{h.name}</p>
+                    <p className="truncate text-[11px] leading-snug text-slate-500">
+                      {formatDateTime(h.paidAt)} · {h.bookingCount} shoot(s)
+                      {h.reference ? ` · Ref ${h.reference}` : ''}
                     </p>
                   </div>
                   <span className="shrink-0 text-sm font-black text-emerald-600">{formatINR(h.amount, { fixed: true })}</span>
@@ -343,36 +355,45 @@ export default function PayoutsPage() {
               ))}
             </ul>
             <div className="hidden overflow-x-auto rounded-xl border border-slate-200 md:block">
-              <table className="w-full text-left text-xs whitespace-nowrap">
-                <thead className="bg-slate-100 text-[10px] font-semibold text-slate-700 uppercase">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-100 text-[10px] font-semibold tracking-wide text-slate-700 uppercase">
                   <tr>
-                    <th className="px-3 py-2.5">Paid on</th>
-                    <th className="px-3 py-2.5">Partner</th>
-                    <th className="px-3 py-2.5">UPI ID</th>
-                    <th className="px-3 py-2.5 text-center">Shoots</th>
-                    <th className="px-3 py-2.5">Reference / Note</th>
-                    <th className="px-3 py-2.5 text-right">Amount</th>
+                    <th className="px-3 py-3">Paid on</th>
+                    <th className="px-3 py-3">Partner</th>
+                    <th className="px-3 py-3">UPI ID</th>
+                    <th className="px-3 py-3 text-center">Shoots</th>
+                    <th className="px-3 py-3">Reference / Note</th>
+                    <th className="px-3 py-3 text-right">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-600">
-                  {history.map((h) => (
-                    <tr key={h.id} className="hover:bg-slate-50">
-                      <td className="px-3 py-3">{formatDateTime(h.paidAt)}</td>
-                      <td className="px-3 py-3">
-                        <p className="font-semibold text-slate-800">{h.name}</p>
-                        <p className="text-[10px] text-slate-400">{h.phone}</p>
+                <tbody className="divide-y divide-slate-100 text-slate-600">
+                  {historySlice.rows.map((h) => (
+                    <tr key={h.id} className="align-middle hover:bg-slate-50/80">
+                      <td className="px-3 py-3.5 leading-snug">{formatDateTime(h.paidAt)}</td>
+                      <td className="px-3 py-3.5">
+                        <p className="leading-snug font-semibold text-slate-800">{h.name}</p>
+                        <p className="mt-0.5 text-[10px] leading-snug text-slate-400">{h.phone}</p>
                       </td>
-                      <td className="px-3 py-3">{h.upiId || '—'}</td>
-                      <td className="px-3 py-3 text-center">{h.bookingCount}</td>
-                      <td className="max-w-[220px] truncate px-3 py-3" title={[h.reference, h.note].filter(Boolean).join(' • ')}>
-                        {[h.reference, h.note].filter(Boolean).join(' • ') || '—'}
+                      <td className="px-3 py-3.5 leading-snug">{h.upiId || '—'}</td>
+                      <td className="px-3 py-3.5 text-center leading-snug">{h.bookingCount}</td>
+                      <td className="max-w-[220px] truncate px-3 py-3.5 leading-snug" title={[h.reference, h.note].filter(Boolean).join(' · ')}>
+                        {[h.reference, h.note].filter(Boolean).join(' · ') || '—'}
                       </td>
-                      <td className="px-3 py-3 text-right font-bold text-emerald-600">{formatINR(h.amount, { fixed: true })}</td>
+                      <td className="px-3 py-3.5 text-right leading-snug font-bold text-emerald-600">{formatINR(h.amount, { fixed: true })}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            <TablePagination
+              pagination={historySlice.pagination}
+              onPageChange={setHistoryPage}
+              onLimitChange={(next) => {
+                setHistoryLimit(next);
+                setHistoryPage(1);
+              }}
+              label="payouts"
+            />
           </>
         )}
       </Card>

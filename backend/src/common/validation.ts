@@ -225,6 +225,16 @@ export const adminBookingQuerySchema = z.object({
     .default('all'),
   q: z.string().trim().max(80).optional().default(''),
   page: z.coerce.number().int().min(1).optional().default(1),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(25),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
 export type AdminBookingQuery = z.output<typeof adminBookingQuerySchema>;
+
+export const adminListQuerySchema = z.object({
+  q: z.string().trim().max(80).optional().default(''),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  duty: z.enum(['all', 'online', 'offline']).optional().default('all'),
+  /** Account lifecycle filter for Customers / Partners lists. */
+  account: z.enum(['all', 'active', 'suspended', 'blocked', 'deleted']).optional().default('all'),
+});
+export type AdminListQuery = z.output<typeof adminListQuerySchema>;

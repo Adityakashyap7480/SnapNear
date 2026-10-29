@@ -3,7 +3,7 @@ import { type SQL, and, asc, desc, eq, gte, ilike, inArray, isNotNull, or, sql }
 import { ApiError } from '../common/api-error.js';
 import { accountNotice } from '../common/account-status.js';
 import { serializeBooking } from '../common/serializers.js';
-import type { AdminBookingQuery, UpdateUserStatusInput } from '../common/validation.js';
+import type { AdminBookingQuery, AdminListQuery, UpdateUserStatusInput } from '../common/validation.js';
 import { ADMIN_EVENTS, BOOKING_EVENTS } from '../constants/events.js';
 import {
   ACCOUNT_STATUS,
@@ -181,7 +181,29 @@ export class AdminService {
     return Object.fromEntries(rows.map((d) => [d.userId, d]));
   }
 
-  async listClients() {
+  private paginate<T>(items: T[], page: number, limit: number) {
+    const total = items.length;
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, pages);
+    return {
+      items: items.slice((safePage - 1) * limit, safePage * limit),
+      pagination: { page: safePage, limit, total, pages },
+    };
+  }
+
+  /** Filter by account lifecycle — deleted = self-deleted (account_deletions row). */
+  private matchesAccountFilter<T extends { deletedAt: Date | string | null; accountStatus: string }>(
+    row: T,
+    account: AdminListQuery['account']
+  ) {
+    const deleted = Boolean(row.deletedAt);
+    if (account === 'deleted') return deleted;
+    if (deleted) return account === 'all';
+    if (account === 'all') return true;
+    return row.accountStatus === account;
+  }
+
+  async listClients({ q, page, limit, account }: AdminListQuery) {
     const [clients, deletions, stats] = await Promise.all([
       this.users.listWithProfiles(eq(users.role, ROLES.CLIENT), desc(users.createdAt)),
       this.deletionMap(),
@@ -193,37 +215,65 @@ export class AdminService {
           active: countOf(inArray(bookings.status, OPEN_OR_ACTIVE)),
           spent: sumOf(bookings.total, isCompleted),
           lastBookingAt: maxOf(bookings.createdAt),
+          // Latest shoot doorstep — used when the customer has no profile GPS yet
+          lastBookingAddress: sql<string | null>`(array_agg(${bookings.address} order by ${bookings.createdAt} desc))[1]`,
+          lastBookingLatitude: sql<number | null>`(array_agg(${bookings.latitude} order by ${bookings.createdAt} desc))[1]`,
+          lastBookingLongitude: sql<number | null>`(array_agg(${bookings.longitude} order by ${bookings.createdAt} desc))[1]`,
         })
         .from(bookings)
         .groupBy(bookings.clientId),
     ]);
 
     const statMap = Object.fromEntries(stats.map((s) => [s.clientId, s]));
-    return {
-      success: true,
-      clients: clients.map((c) => {
-        const s = statMap[c.id];
-        const d = deletions[c.id];
-        return {
-          id: c.id,
-          name: d?.name ?? c.name,
-          email: c.email,
-          phone: c.phone,
-          city: c.city,
-          joinedAt: c.createdAt,
-          deletedAt: d?.deletedAt ?? null,
-          bookings: s?.bookings || 0,
-          completed: s?.completed || 0,
-          active: s?.active || 0,
-          spent: s?.spent || 0,
-          lastBookingAt: s?.lastBookingAt || null,
-          ...accountFields(c),
-        };
-      }),
+    const needle = q.trim().toLowerCase();
+    const all = clients.map((c) => {
+      const s = statMap[c.id];
+      const d = deletions[c.id];
+      const address = (c.address || s?.lastBookingAddress || '').trim();
+      const latitude = c.latitude ?? s?.lastBookingLatitude ?? null;
+      const longitude = c.longitude ?? s?.lastBookingLongitude ?? null;
+      const fields = accountFields(c);
+      return {
+        id: c.id,
+        // Prefer pre-deletion identity so Super Admin still knows who left
+        name: d?.name ?? c.name,
+        email: d?.email ?? c.email,
+        phone: d?.phone || c.phone,
+        city: c.city,
+        address,
+        latitude,
+        longitude,
+        locationUpdatedAt: c.locationUpdatedAt || null,
+        joinedAt: c.createdAt,
+        deletedAt: d?.deletedAt ?? null,
+        bookings: s?.bookings || 0,
+        completed: s?.completed || 0,
+        active: s?.active || 0,
+        spent: s?.spent || 0,
+        lastBookingAt: s?.lastBookingAt || null,
+        ...fields,
+      };
+    });
+    const mapped = all.filter((c) => {
+      if (!this.matchesAccountFilter(c, account)) return false;
+      return (
+        !needle ||
+        [c.name, c.email, c.phone, c.city, c.address].some((v) => v?.toLowerCase().includes(needle))
+      );
+    });
+
+    const { items, pagination } = this.paginate(mapped, page, limit);
+    const summary = {
+      total: all.length,
+      bookings: all.reduce((n, c) => n + c.bookings, 0),
+      active: all.reduce((n, c) => n + c.active, 0),
+      spent: all.reduce((n, c) => n + c.spent, 0),
+      deleted: all.filter((c) => c.deletedAt).length,
     };
+    return { success: true, clients: items, pagination, summary };
   }
 
-  async listCreators() {
+  async listCreators({ q, page, limit, duty, account }: AdminListQuery) {
     const [creators, stats, deletions] = await Promise.all([
       this.users.listWithProfiles(eq(users.role, ROLES.CREATOR), desc(users.createdAt)),
       this.db
@@ -242,34 +292,56 @@ export class AdminService {
     ]);
 
     const statMap = Object.fromEntries(stats.map((s) => [s.creatorId, s]));
-    return {
-      success: true,
-      creators: creators.map((c) => {
-        const s = statMap[c.id];
-        const d = deletions[c.id];
-        return {
-          id: c.id,
-          name: d?.name ?? c.name,
-          email: c.email,
-          phone: c.phone,
-          city: c.city,
-          joinedAt: c.createdAt,
-          deletedAt: d?.deletedAt ?? null,
-          services: c.creatorProfile?.services || [],
-          experienceYears: c.creatorProfile?.experienceYears || 0,
-          gear: c.creatorProfile?.gear || '',
-          rating: c.creatorProfile?.rating ?? 5,
-          ratingCount: c.creatorProfile?.ratingCount ?? 0,
-          isOnline: Boolean(c.creatorProfile?.isOnline),
-          accepted: s?.accepted || 0,
-          completed: s?.completed || 0,
-          active: s?.active || 0,
-          earnings: s?.earnings || 0,
-          platformFee: s?.platformFee || 0,
-          ...accountFields(c),
-        };
-      }),
+    const needle = q.trim().toLowerCase();
+    const all = creators.map((c) => {
+      const s = statMap[c.id];
+      const d = deletions[c.id];
+      const fields = accountFields(c);
+      return {
+        id: c.id,
+        name: d?.name ?? c.name,
+        email: d?.email ?? c.email,
+        phone: d?.phone || c.phone,
+        city: c.city,
+        address: (c.address || '').trim(),
+        latitude: c.latitude ?? null,
+        longitude: c.longitude ?? null,
+        locationUpdatedAt: c.locationUpdatedAt || null,
+        joinedAt: c.createdAt,
+        deletedAt: d?.deletedAt ?? null,
+        services: c.creatorProfile?.services || [],
+        experienceYears: c.creatorProfile?.experienceYears || 0,
+        gear: c.creatorProfile?.gear || '',
+        rating: c.creatorProfile?.rating ?? 5,
+        ratingCount: c.creatorProfile?.ratingCount ?? 0,
+        isOnline: Boolean(c.creatorProfile?.isOnline),
+        accepted: s?.accepted || 0,
+        completed: s?.completed || 0,
+        active: s?.active || 0,
+        earnings: s?.earnings || 0,
+        platformFee: s?.platformFee || 0,
+        ...fields,
+      };
+    });
+    const mapped = all.filter((c) => {
+      if (duty === 'online' && !c.isOnline) return false;
+      if (duty === 'offline' && c.isOnline) return false;
+      if (!this.matchesAccountFilter(c, account)) return false;
+      return (
+        !needle ||
+        [c.name, c.email, c.phone, c.city, c.address].some((v) => v?.toLowerCase().includes(needle))
+      );
+    });
+
+    const { items, pagination } = this.paginate(mapped, page, limit);
+    const summary = {
+      total: all.length,
+      online: all.filter((c) => c.isOnline).length,
+      activeJobs: all.reduce((n, c) => n + c.active, 0),
+      earnings: all.reduce((n, c) => n + c.earnings, 0),
+      deleted: all.filter((c) => c.deletedAt).length,
     };
+    return { success: true, creators: items, pagination, summary };
   }
 
   async cancelBooking(id: string) {

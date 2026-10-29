@@ -128,6 +128,8 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    /* Keep scrollbar gutter so the sticky navbar doesn't shift between short/tall tabs */
+    overflow-y: scroll;
   }
 
   body {

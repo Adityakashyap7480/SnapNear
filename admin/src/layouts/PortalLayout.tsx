@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { Banknote, Bell, Briefcase, ChevronDown, LogOut, PieChart, ShieldCheck, Users, Wifi, WifiOff } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet } from 'react-router-dom';
+import { Banknote, Briefcase, ChevronDown, LogOut, PieChart, ShieldCheck, Users } from 'lucide-react';
 import Logo from '../components/ui/Logo';
-import Avatar from '../components/ui/Avatar';
 import AdminPayoutAlerts from '../components/admin/AdminPayoutAlerts';
 import AdminShootAlerts from '../components/admin/AdminShootAlerts';
-import { adminApi } from '../api/services';
-import useAdminLive from '../hooks/useAdminLive';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
-import { useSocket } from '../context/SocketContext';
 import { ROLE_LABELS } from '../config/constants';
 import { ROUTES } from '../config/routes';
 import type { User } from '../types';
@@ -31,77 +27,57 @@ function UserMenu({ user }: { user: User }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white py-1 pr-2 pl-1 transition hover:bg-slate-50"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white py-1.5 pr-2.5 pl-1.5 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
       >
-        <Avatar name={user.name} size="sm" />
-        <div className="hidden text-left leading-tight lg:block">
-          <p className="max-w-[120px] truncate text-xs font-bold text-slate-900">{user.name}</p>
-          <p className="text-[10px] font-medium text-slate-500">{ROLE_LABELS[user.role]}</p>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white shadow-sm">
+          <ShieldCheck className="h-4 w-4" strokeWidth={2.25} />
+        </span>
+        <div className="hidden min-w-0 text-left sm:block">
+          <p className="truncate text-[13px] font-semibold leading-none text-slate-900">{user.name}</p>
+          <p className="mt-1 truncate text-[10px] font-medium tracking-wide text-slate-500 uppercase">Owner</p>
         </div>
-        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-60 animate-fade-up rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-          <div className="border-b border-slate-100 px-3 py-2.5">
-            <p className="text-sm font-bold text-slate-900">{user.name}</p>
-            <p className="truncate text-xs text-slate-500">{user.email}</p>
-            <span className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700">
-              <ShieldCheck className="h-3 w-3" /> {ROLE_LABELS[user.role]}
+        <div
+          role="menu"
+          className="absolute right-0 z-50 mt-2 w-64 animate-fade-up overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
+        >
+          <div className="border-b border-slate-100 bg-slate-50/80 px-4 py-3.5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                <ShieldCheck className="h-5 w-5" strokeWidth={2.25} />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900">{user.name}</p>
+                <p className="truncate text-xs text-slate-500">{user.email}</p>
+              </div>
+            </div>
+            <span className="mt-3 inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[10px] font-bold tracking-wide text-slate-700 uppercase ring-1 ring-slate-200">
+              <ShieldCheck className="h-3 w-3 text-slate-500" /> {ROLE_LABELS[user.role]}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={logout}
-            className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50"
-          >
-            <LogOut className="h-4 w-4" /> Log out
-          </button>
+          <div className="p-1.5">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={logout}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+            >
+              <LogOut className="h-4 w-4" /> Log out
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-/** Bell with a live badge for partner payout requests waiting on the Payouts page. */
-function PayoutBell() {
-  const navigate = useNavigate();
-  const [count, setCount] = useState(0);
-
-  const refresh = useCallback(() => {
-    adminApi
-      .payouts()
-      .then((d) => setCount(d.requests.length))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, 60_000);
-    return () => clearInterval(id);
-  }, [refresh]);
-  useAdminLive(refresh);
-
-  return (
-    <button
-      type="button"
-      onClick={() => navigate(ROUTES.PAYOUTS)}
-      title={count > 0 ? `${count} payout request(s) waiting` : 'Payout requests'}
-      className="relative rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-    >
-      <Bell className="h-4 w-4" />
-      {count > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">
-          {count}
-        </span>
-      )}
-    </button>
-  );
-}
-
 export default function PortalLayout() {
   const { user } = useAuth();
-  const { connected } = useSocket();
   const { partnerPct, platformPct, startingPrice } = useCatalog();
   if (!user) return null;
 
@@ -117,44 +93,36 @@ export default function PortalLayout() {
       <AdminShootAlerts />
       <AdminPayoutAlerts />
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
-          <div className="min-w-0">
+        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="min-w-0 shrink-0">
             <Logo tagline="Owner control centre" badge="Live" />
           </div>
 
-          <nav className="hidden items-center rounded-xl border border-slate-200 bg-slate-100 p-1 md:flex">
-            {nav.map(({ to, label, icon: Icon, color }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition lg:px-3.5 ${
-                    isActive ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                  }`
-                }
-              >
-                <Icon className={`h-3.5 w-3.5 ${color}`} />
-                {label}
-              </NavLink>
-            ))}
+          <nav className="hidden min-w-0 flex-1 justify-center md:flex">
+            <div className="grid grid-cols-4 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+              {nav.map(({ to, label, icon: Icon, color }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition lg:min-w-[8.5rem] lg:px-3 ${
+                      isActive ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                    }`
+                  }
+                >
+                  <Icon className={`h-3.5 w-3.5 shrink-0 ${color}`} />
+                  {label}
+                </NavLink>
+              ))}
+            </div>
           </nav>
 
-          <div className="flex shrink-0 items-center gap-2">
-            <PayoutBell />
-            <span
-              title={connected ? 'Live updates connected' : 'Reconnecting...'}
-              className={`hidden items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold sm:flex ${
-                connected ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-              }`}
-            >
-              {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              {connected ? 'Live' : 'Offline'}
-            </span>
+          <div className="flex shrink-0 items-center justify-end">
             <UserMenu user={user} />
           </div>
         </div>
 
-        <nav className="no-scrollbar flex gap-1 overflow-x-auto border-t border-slate-100 px-3 py-2 sm:px-4 md:hidden">
+        <nav className="no-scrollbar flex gap-1 overflow-x-auto border-t border-slate-100 px-4 py-2 sm:px-6 md:hidden">
           {nav.map(({ to, label, icon: Icon, color }) => (
             <NavLink
               key={to}
@@ -172,12 +140,12 @@ export default function PortalLayout() {
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-7xl flex-grow px-3 py-5 sm:px-4 sm:py-6">
+      <main className="w-full flex-grow px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
         <Outlet />
       </main>
 
       <footer className="border-t border-slate-200 bg-white py-5 text-xs text-slate-500">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 text-center sm:flex-row sm:text-left">
+        <div className="flex w-full flex-col items-center justify-between gap-2 px-4 text-center sm:flex-row sm:px-6 sm:text-left lg:px-8">
           <p>
             &copy; {new Date().getFullYear()} SnapNear Technologies. Photographers & videographers at your doorstep from{' '}
             {formatINR(startingPrice.photo)}/hr.

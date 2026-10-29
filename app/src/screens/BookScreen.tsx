@@ -8,7 +8,7 @@ import { Input, Select, Textarea } from '../components/ui/FormField';
 import Gradient from '../components/ui/Gradient';
 import { PageLoader } from '../components/ui/Spinner';
 import Text from '../components/ui/Text';
-import { FadeUp, Pulse } from '../components/ui/motion';
+import { FadeUp, Pulse, WaveHand } from '../components/ui/motion';
 import CancelBookingModal from '../components/booking/CancelBookingModal';
 import DurationTiles from '../components/booking/DurationTiles';
 import FareCard from '../components/booking/FareCard';
@@ -415,7 +415,7 @@ export default function BookScreen() {
 
       <View>
         <Text role="heading" className="font-display text-xl font-extrabold text-slate-900 sm:text-2xl">
-          Hi {user.name.split(' ')[0]}, book a photographer 👋
+          Hi {user.name.split(' ')[0]}, book a photographer <WaveHand />
         </Text>
         <Text className="text-sm text-slate-500">Verified photographers & videographers at your doorstep in minutes.</Text>
       </View>

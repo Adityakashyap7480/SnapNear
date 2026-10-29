@@ -7,7 +7,7 @@ import Text from '../ui/Text';
 import { Pulse } from '../ui/motion';
 import ShootTimer from '../shoot/ShootTimer';
 import StartShootForm from '../shoot/StartShootForm';
-import { BOOKING_STATUS } from '../../config/constants';
+import { BOOKING_STATUS, type BookingStatus } from '../../config/constants';
 import { openLink } from '../../lib/links';
 import type { Booking } from '../../types';
 import { colors } from '../../theme/colors';
@@ -31,7 +31,7 @@ interface ActiveJobCardProps {
   cancelling?: boolean;
 }
 
-const PARTNER_CAN_CANCEL = new Set([BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.ARRIVED]);
+const PARTNER_CAN_CANCEL = new Set<BookingStatus>([BOOKING_STATUS.ASSIGNED, BOOKING_STATUS.ARRIVED]);
 
 function Detail({ label, children, full = false, wide }: { label: string; children: ReactNode; full?: boolean; wide: boolean }) {
   return (

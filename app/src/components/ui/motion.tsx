@@ -115,6 +115,29 @@ export function Ring({ children, className, style, enabled = true }: MotionProps
   );
 }
 
+/** .wave-hand — same keyframes as CSS wave-hand 1.6s ease-in-out infinite */
+export function WaveHand({ className, style }: MotionProps) {
+  const v = useLoop((a) => timing(a, 1, 1600, Easing.inOut(Easing.ease)));
+  const rotate = v.interpolate({
+    inputRange: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 1],
+    outputRange: ['0deg', '14deg', '-8deg', '12deg', '-6deg', '10deg', '0deg', '0deg'],
+  });
+  return (
+    <Animated.Text
+      accessible={false}
+      importantForAccessibility="no"
+      className={className}
+      style={[
+        style,
+        Platform.OS === 'web' ? ({ display: 'inline-block', transformOrigin: '70% 70%' } as object) : null,
+        { transform: [{ rotate }] },
+      ]}
+    >
+      👋
+    </Animated.Text>
+  );
+}
+
 /** animate-gift-shake: plays once on mount */
 export function GiftShake({ children, className, style }: MotionProps) {
   const v = useRef(new Animated.Value(0)).current;

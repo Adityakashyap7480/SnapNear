@@ -105,11 +105,27 @@ const bgSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024
   <rect width="1024" height="1024" fill="url(#g)"/>
 </svg>`;
 
-await sharp(logoPath).resize(1024, 1024, { fit: 'cover' }).png().toFile(path.join(assets, 'android-icon-foreground.png'));
+const size = 1024;
+const inset = Math.round(size * 0.72);
+const pad = Math.round((size - inset) / 2);
+const scaledFg = await sharp(logoPath)
+  .resize(inset, inset, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+  .png()
+  .toBuffer();
+
+// Adaptive foreground: logo inset so Android's mask keeps people/pin/orbit visible
+await sharp({
+  create: { width: size, height: size, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+})
+  .composite([{ input: scaledFg, left: pad, top: pad }])
+  .png()
+  .toFile(path.join(assets, 'android-icon-foreground.png'));
+
 await sharp(logoPath).resize(1024, 1024, { fit: 'cover' }).png().toFile(path.join(assets, 'icon.png'));
 await sharp(logoPath).resize(512, 512, { fit: 'cover' }).png().toFile(path.join(assets, 'splash-icon.png'));
 await sharp(logoPath).resize(48, 48, { fit: 'cover' }).png().toFile(path.join(assets, 'favicon.png'));
 await sharp(logoPath).png().toFile(path.join(assets, 'brand-logo.png'));
+await sharp(logoPath).png().toFile(path.join(assets, 'logo-mark.png'));
 await sharp(Buffer.from(bgSvg)).png().toFile(path.join(assets, 'android-icon-background.png'));
 await sharp(logoPath).resize(1024, 1024, { fit: 'cover' }).greyscale().threshold(200).png().toFile(path.join(assets, 'android-icon-monochrome.png'));
 

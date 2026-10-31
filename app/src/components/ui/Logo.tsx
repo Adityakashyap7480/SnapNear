@@ -1,9 +1,8 @@
-import { View } from 'react-native';
-import { Camera } from 'lucide-react-native';
-import Gradient from './Gradient';
+import { Image, View } from 'react-native';
 import Text from './Text';
-import { colors } from '../../theme/colors';
 import { shadows } from '../../theme/shadows';
+
+const logo = require('../../../assets/logo-mark.png');
 
 interface LogoProps {
   tagline?: string;
@@ -14,17 +13,18 @@ interface LogoProps {
 
 export default function Logo({ tagline = 'Photographers at your doorstep', badge, dark = false, size = 'md' }: LogoProps) {
   const lg = size === 'lg';
+  const box = lg ? 48 : 40;
+  const radius = lg ? 16 : 12;
 
   return (
     <View className="flex-row items-center gap-2.5">
-      <Gradient
-        colors={[colors.brand.orange, colors.brand.yellow]}
-        to="tr"
-        className={`shrink-0 items-center justify-center ${lg ? 'h-12 w-12 rounded-2xl' : 'h-10 w-10 rounded-xl'}`}
-        style={shadows.glow}
-      >
-        <Camera size={lg ? 24 : 20} color={colors.white} />
-      </Gradient>
+      <View style={[{ width: box, height: box, borderRadius: radius, overflow: 'hidden', backgroundColor: 'transparent' }, shadows.glow]}>
+        <Image
+          source={logo}
+          accessibilityLabel="SnapNear"
+          style={{ width: box, height: box, backgroundColor: 'transparent' }}
+        />
+      </View>
       <View className="min-w-0 shrink">
         <View className="flex-row items-center gap-1.5">
           <Text className={`font-display font-extrabold tracking-tight ${lg ? 'text-2xl' : 'text-xl'} ${dark ? 'text-white' : 'text-slate-900'}`}>

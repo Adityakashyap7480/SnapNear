@@ -1,4 +1,4 @@
-import { Camera } from 'lucide-react';
+import logo from '../../assets/logo-mark.png';
 
 interface LogoProps {
   tagline?: string;
@@ -9,16 +9,15 @@ interface LogoProps {
 
 export default function Logo({ tagline = 'Photographers at your doorstep', badge, dark = false, size = 'md' }: LogoProps) {
   const box = size === 'lg' ? 'h-12 w-12 rounded-2xl' : 'h-10 w-10 rounded-xl';
-  const icon = size === 'lg' ? 'h-6 w-6' : 'h-5 w-5';
   const text = size === 'lg' ? 'text-2xl' : 'text-xl';
 
   return (
     <div className="flex items-center gap-2.5">
-      <div
-        className={`${box} flex shrink-0 items-center justify-center bg-gradient-to-tr from-brand-orange to-brand-yellow text-white shadow-glow`}
-      >
-        <Camera className={icon} />
-      </div>
+      <img
+        src={logo}
+        alt="SnapNear"
+        className={`${box} shrink-0 bg-transparent object-cover shadow-glow`}
+      />
       <div className="min-w-0 leading-tight">
         <div className="flex items-center gap-1.5">
           <span className={`font-display font-extrabold tracking-tight ${text} ${dark ? 'text-white' : 'text-slate-900'}`}>

@@ -13,7 +13,7 @@ export default function App() {
           <SocketProvider>
             <AppRoutes />
             <Toaster
-              position={window.matchMedia('(max-width: 639px)').matches ? 'top-center' : 'bottom-right'}
+              position={window.matchMedia('(max-width: 639px)').matches ? 'top-center' : 'top-right'}
               toastOptions={{
                 duration: 4500,
                 style: {

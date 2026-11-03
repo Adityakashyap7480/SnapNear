@@ -23,7 +23,7 @@ function ToastIcon({ item }: { item: ToastItem }) {
   return item.icon ? <Text className="text-base">{item.icon}</Text> : null;
 }
 
-/** Top-centre on phones, bottom-right on wide screens (as on the web app). */
+/** Top-centre on phones, top-right on wide screens. */
 export default function Toaster({ host = 'root' }: { host?: string }) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const [isTop, setIsTop] = useState(() => toastHosts.top() === host);
@@ -49,7 +49,7 @@ export default function Toaster({ host = 'root' }: { host?: string }) {
     <View
       pointerEvents="box-none"
       className={`absolute left-0 right-0 z-50 px-4 ${mobile ? 'items-center' : 'items-end'}`}
-      style={mobile ? { top: insets.top + 16 } : { bottom: insets.bottom + 16 }}
+      style={{ top: insets.top + (mobile ? 16 : 72) }}
     >
       {(mobile ? items : [...items].reverse()).map((item) => (
         <FadeUp key={item.id + item.createdAt} className="mb-2 max-w-[350px]">

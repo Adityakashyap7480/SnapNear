@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { Banknote, Briefcase, ChevronDown, LogOut, PieChart, ShieldCheck, Users } from 'lucide-react';
+import { Banknote, Briefcase, ChevronDown, IndianRupee, LogOut, PieChart, ShieldCheck, Users } from 'lucide-react';
 import Logo from '../components/ui/Logo';
 import AdminPayoutAlerts from '../components/admin/AdminPayoutAlerts';
 import AdminShootAlerts from '../components/admin/AdminShootAlerts';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
+import { useSocketEvent } from '../context/SocketContext';
 import { ROLE_LABELS } from '../config/constants';
+import { SOCKET_EVENTS } from '../config/events';
 import { ROUTES } from '../config/routes';
 import type { User } from '../types';
 import { formatINR } from '../utils/format';
@@ -78,7 +80,10 @@ function UserMenu({ user }: { user: User }) {
 
 export default function PortalLayout() {
   const { user } = useAuth();
-  const { partnerPct, platformPct, startingPrice } = useCatalog();
+  const { partnerPct, platformPct, startingPrice, reload } = useCatalog();
+  useSocketEvent(SOCKET_EVENTS.CATALOG_UPDATE, () => {
+    reload();
+  });
   if (!user) return null;
 
   const nav = [
@@ -86,6 +91,7 @@ export default function PortalLayout() {
     { to: ROUTES.PARTNERS, label: 'Partners', icon: Briefcase, color: 'text-brand-violet' },
     { to: ROUTES.PLATFORM, label: `Platform ${platformPct}`, icon: PieChart, color: 'text-emerald-600' },
     { to: ROUTES.PAYOUTS, label: 'Payouts', icon: Banknote, color: 'text-teal-600' },
+    { to: ROUTES.PRICING, label: 'Pricing', icon: IndianRupee, color: 'text-amber-600' },
   ];
 
   return (
@@ -99,13 +105,13 @@ export default function PortalLayout() {
           </div>
 
           <nav className="hidden min-w-0 flex-1 justify-center md:flex">
-            <div className="grid grid-cols-4 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
+            <div className="flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1">
               {nav.map(({ to, label, icon: Icon, color }) => (
                 <NavLink
                   key={to}
                   to={to}
                   className={({ isActive }) =>
-                    `flex min-w-[7.5rem] items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition lg:min-w-[8.5rem] lg:px-3 ${
+                    `flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition lg:px-3 ${
                       isActive ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
                     }`
                   }

@@ -4,13 +4,16 @@ import {
   type AdminBookingQuery,
   type AdminListQuery,
   type MarkPayoutInput,
+  type UpdateSessionPricesInput,
   type UpdateUserStatusInput,
   adminBookingQuerySchema,
   adminListQuerySchema,
   markPayoutSchema,
+  updateSessionPricesSchema,
   updateUserStatusSchema,
 } from '../common/validation.js';
 import { ZodPipe } from '../common/zod.pipe.js';
+import { PricingService } from '../catalog/pricing.service.js';
 import { ROLES } from '../constants/roles.js';
 import { AdminService } from './admin.service.js';
 import { PayoutsService } from './payouts.service.js';
@@ -20,12 +23,23 @@ import { PayoutsService } from './payouts.service.js';
 export class AdminController {
   constructor(
     private readonly admin: AdminService,
-    private readonly payouts: PayoutsService
+    private readonly payouts: PayoutsService,
+    private readonly pricing: PricingService
   ) {}
 
   @Get('overview')
   overview() {
     return this.admin.overview();
+  }
+
+  @Get('pricing')
+  sessionPricing() {
+    return { pricing: this.pricing.sessionRates() };
+  }
+
+  @Patch('pricing')
+  updateSessionPricing(@Body(new ZodPipe(updateSessionPricesSchema)) body: UpdateSessionPricesInput) {
+    return this.pricing.updateSessionPrices(body).then((pricing) => ({ pricing }));
   }
 
   @Get('bookings')

@@ -6,6 +6,7 @@ import PlatformDashboardPage from '../pages/PlatformDashboardPage';
 import CustomersPage from '../pages/CustomersPage';
 import PartnersPage from '../pages/PartnersPage';
 import PayoutsPage from '../pages/PayoutsPage';
+import PricingPage from '../pages/PricingPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import { ROUTES } from '../config/routes';
 
@@ -23,6 +24,7 @@ export default function AppRoutes() {
           <Route path={ROUTES.PARTNERS} element={<PartnersPage />} />
           <Route path={ROUTES.PLATFORM} element={<PlatformDashboardPage />} />
           <Route path={ROUTES.PAYOUTS} element={<PayoutsPage />} />
+          <Route path={ROUTES.PRICING} element={<PricingPage />} />
         </Route>
       </Route>
 

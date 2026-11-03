@@ -21,6 +21,8 @@ interface CatalogValue {
   supportEmail: string;
   startOtpLength: number;
   payoutHoldDays: number;
+  /** Pulls fresh prices without blanking the screen. */
+  reload: () => void;
 }
 
 const CatalogContext = createContext<CatalogValue | null>(null);
@@ -47,6 +49,15 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         setCatalog(res.catalog);
       })
       .catch((err: ApiFailure) => setError(err.message || 'Unable to reach SnapNear servers'));
+  }, []);
+
+  const reload = useCallback(() => {
+    catalogApi
+      .get()
+      .then((res) => {
+        if (res?.catalog) setCatalog(res.catalog);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -76,8 +87,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       supportEmail: catalog.supportEmail || SUPPORT_EMAIL,
       startOtpLength: catalog.startOtpLength || 4,
       payoutHoldDays: catalog.payoutHoldDays || 7,
+      reload,
     };
-  }, [catalog]);
+  }, [catalog, reload]);
 
   // Guests (login/signup): no catalog fetch, screens must not call useCatalog
   if (!needsCatalog) {

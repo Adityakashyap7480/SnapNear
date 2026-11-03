@@ -14,6 +14,8 @@ interface CatalogValue {
   /** Cheapest package per service, e.g. { photo: 500, video: 999 } */
   startingPrice: Record<string, number>;
   supportEmail: string;
+  /** Pulls fresh prices without blanking the page. */
+  reload: () => void;
 }
 
 const CatalogContext = createContext<CatalogValue | null>(null);
@@ -33,6 +35,15 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       .catch((err: ApiFailure) => setError(err.message));
   }, []);
 
+  const reload = useCallback(() => {
+    catalogApi
+      .get()
+      .then((res) => {
+        if (res?.catalog) setCatalog(res.catalog);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(load, [load]);
 
   const value = useMemo(() => {
@@ -46,8 +57,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       platformPct: pct(catalog.platformShare),
       startingPrice,
       supportEmail: catalog.supportEmail || SUPPORT_EMAIL,
+      reload,
     };
-  }, [catalog]);
+  }, [catalog, reload]);
 
   if (error) {
     return (

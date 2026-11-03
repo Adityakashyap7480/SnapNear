@@ -6,5 +6,6 @@ export const ROUTES = Object.freeze({
   PARTNERS: '/partners',
   PLATFORM: '/platform',
   PAYOUTS: '/payouts',
+  PRICING: '/pricing',
   NOT_FOUND: '*',
 });

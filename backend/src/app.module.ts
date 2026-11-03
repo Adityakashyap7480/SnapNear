@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { AdminModule } from './admin/admin.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BookingsModule } from './bookings/bookings.module.js';
-import { CatalogController } from './catalog/catalog.controller.js';
+import { CatalogModule } from './catalog/catalog.module.js';
 import { CreatorModule } from './creator/creator.module.js';
 import { FallbackModule } from './fallback/fallback.controller.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
@@ -19,9 +19,9 @@ import { RepositoriesModule } from './repositories/repositories.module.js';
     BookingsModule,
     CreatorModule,
     PaymentsModule,
+    CatalogModule,
     AdminModule,
     FallbackModule,
   ],
-  controllers: [CatalogController],
 })
 export class AppModule {}

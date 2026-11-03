@@ -84,6 +84,11 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     });
   }
 
+  /** Open apps refetch /catalog so Book a shoot shows the new price. */
+  notifyCatalogUpdated() {
+    this.server?.emit(SOCKET_EVENTS.CATALOG_UPDATE, { at: new Date().toISOString() });
+  }
+
   notifyAdmins(event: string, payload: Record<string, unknown> = {}) {
     this.emit(rooms.admins, SOCKET_EVENTS.ADMIN_UPDATE, { event, ...payload });
   }

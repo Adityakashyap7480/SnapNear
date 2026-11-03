@@ -38,27 +38,78 @@ const withTestMode = (tier: PricingTier): PricingTier =>
     ? { ...tier, label: `${testMinutes} Min${testMinutes === 1 ? '' : 's'}`, subtitle: 'Test shoot' }
     : tier;
 
-const { photo, video } = env.prices;
+export type PriceBook = Record<ServiceType, Record<SessionPackageId, number>>;
 
-/** Built from SESSION_PACKAGES + live prices (env override or package defaults). */
-const BASE_PRICING_TIERS: Record<ServiceType, PricingTier[]> = {
-  photo: SESSION_PACKAGES.map((p) => ({
-    id: p.id,
-    label: p.label,
-    subtitle: p.photo.subtitle,
-    total: photo[p.id],
-  })),
-  video: SESSION_PACKAGES.map((p) => ({
-    id: p.id,
-    label: p.label,
-    subtitle: p.video.subtitle,
-    total: video[p.id],
-  })),
+/** Partial prices saved by Super Admin. Missing packages keep the env / package default. */
+export type SessionPriceOverrides = {
+  photo?: Partial<Record<SessionPackageId, number>>;
+  video?: Partial<Record<SessionPackageId, number>>;
 };
 
-export const PRICING_TIERS = Object.fromEntries(
-  Object.entries(BASE_PRICING_TIERS).map(([type, tiers]) => [type, tiers.map(withTestMode)])
-) as Record<ServiceType, PricingTier[]>;
+const PACKAGE_IDS = SESSION_PACKAGES.map((p) => p.id);
+
+let livePrices: PriceBook = {
+  photo: { ...env.prices.photo },
+  video: { ...env.prices.video },
+};
+
+export function getLivePrices(): PriceBook {
+  return livePrices;
+}
+
+const validRupee = (n: unknown): n is number =>
+  typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 500_000;
+
+/** Keeps only known package ids and whole-rupee amounts. */
+export function sanitizeOverrides(raw: unknown): SessionPriceOverrides {
+  if (!raw || typeof raw !== 'object') return {};
+  const source = raw as SessionPriceOverrides;
+  const pick = (bag: SessionPriceOverrides['photo']): SessionPriceOverrides['photo'] => {
+    if (!bag || typeof bag !== 'object') return undefined;
+    const out: Partial<Record<SessionPackageId, number>> = {};
+    for (const id of PACKAGE_IDS) {
+      const n = bag[id];
+      if (validRupee(n)) out[id] = n;
+    }
+    return Object.keys(out).length ? out : undefined;
+  };
+  return { photo: pick(source.photo), video: pick(source.video) };
+}
+
+/** Env / package defaults, then Super Admin overrides on top. */
+export function applyPriceOverrides(raw: unknown): SessionPriceOverrides {
+  const clean = sanitizeOverrides(raw);
+  const next: PriceBook = {
+    photo: { ...env.prices.photo },
+    video: { ...env.prices.video },
+  };
+  for (const service of ['photo', 'video'] as const) {
+    const bag = clean[service];
+    if (!bag) continue;
+    for (const id of PACKAGE_IDS) {
+      const n = bag[id];
+      if (n != null) next[service][id] = n;
+    }
+  }
+  livePrices = next;
+  return clean;
+}
+
+function tiersFor(service: ServiceType): PricingTier[] {
+  return SESSION_PACKAGES.map((pack) =>
+    withTestMode({
+      id: pack.id,
+      label: pack.label,
+      subtitle: pack[service].subtitle,
+      total: livePrices[service][pack.id],
+    })
+  );
+}
+
+/** Current packages. Prices can change without a restart. */
+export function getPricingTiers(): Record<ServiceType, PricingTier[]> {
+  return { photo: tiersFor('photo'), video: tiersFor('video') };
+}
 
 export const OCCASIONS = [
   'Birthday Celebration',
@@ -94,7 +145,7 @@ export interface Quote {
 }
 
 export function getQuote(serviceType: string, durationId: string): Quote | null {
-  const tiers = PRICING_TIERS[serviceType as ServiceType];
+  const tiers = getPricingTiers()[serviceType as ServiceType];
   if (!tiers) return null;
   const tier = tiers.find((t) => t.id === durationId);
   if (!tier) return null;

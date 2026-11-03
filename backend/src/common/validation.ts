@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { env } from '../config/env.js';
-import { OCCASIONS, PRICING_TIERS, TIME_SLOTS } from '../constants/pricing.js';
+import { OCCASIONS, TIME_SLOTS } from '../constants/pricing.js';
+import { SESSION_PACKAGES } from '../constants/session-packages.js';
 import { SERVICE_TYPES } from '../constants/roles.js';
 
 const phone = z
@@ -132,7 +133,10 @@ export const resetPasswordSchema = z.object({
 });
 export type ResetPasswordInput = z.output<typeof resetPasswordSchema>;
 
-const durationIds = [...new Set(Object.values(PRICING_TIERS).flat().map((t) => t.id))];
+const durationIds = SESSION_PACKAGES.map((p) => p.id) as [
+  (typeof SESSION_PACKAGES)[number]['id'],
+  ...(typeof SESSION_PACKAGES)[number]['id'][],
+];
 
 export const createBookingSchema = z.object({
   serviceType: z.enum(SERVICE_TYPES),
@@ -238,3 +242,24 @@ export const adminListQuerySchema = z.object({
   account: z.enum(['all', 'active', 'suspended', 'blocked', 'deleted']).optional().default('all'),
 });
 export type AdminListQuery = z.output<typeof adminListQuerySchema>;
+
+const rupees = z.coerce
+  .number()
+  .int('Enter a whole rupee amount')
+  .min(1, 'Price must be at least ₹1')
+  .max(500_000, 'Price looks too high');
+
+/** One price per session package. Keys match SESSION_PACKAGES ids. */
+const packagePrices = z.object({
+  '1hr': rupees,
+  '2hr': rupees,
+  '4hr': rupees,
+  '1day': rupees,
+});
+
+/** Super Admin edits every Photos and Video session price. */
+export const updateSessionPricesSchema = z.object({
+  photo: packagePrices,
+  video: packagePrices,
+});
+export type UpdateSessionPricesInput = z.output<typeof updateSessionPricesSchema>;

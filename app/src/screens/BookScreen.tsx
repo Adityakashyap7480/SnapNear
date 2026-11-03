@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View, useWindowDimensions } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { Clock, IndianRupee, LocateFixed, MapPin, Phone, Radio, User } from 'lucide-react-native';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -63,7 +64,12 @@ type FormErrors = Partial<Record<keyof BookingForm, string>>;
 
 export default function BookScreen() {
   const { user } = useAuth();
-  const { catalog } = useCatalog();
+  const { catalog, reload: reloadCatalog } = useCatalog();
+  useFocusEffect(
+    useCallback(() => {
+      reloadCatalog();
+    }, [reloadCatalog])
+  );
   const { scrollIntoView } = useScroll();
   const { width } = useWindowDimensions();
   const sm = width >= 640;

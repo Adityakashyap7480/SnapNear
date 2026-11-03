@@ -52,6 +52,24 @@ export interface PricingTier {
   durationMinutes: number;
 }
 
+export interface PackageRate {
+  id: string;
+  label: string;
+  subtitle: string;
+  price: number;
+}
+
+export interface ServicePricing {
+  service: 'photo' | 'video';
+  serviceLabel: string;
+  packages: PackageRate[];
+}
+
+export interface SessionPricing {
+  photo: ServicePricing;
+  video: ServicePricing;
+}
+
 export interface Catalog {
   creatorShare: number;
   platformShare: number;

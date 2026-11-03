@@ -7,6 +7,7 @@ import type {
   Catalog,
   Overview,
   Pagination,
+  SessionPricing,
   PayoutRecord,
   PayoutsData,
   Session,
@@ -47,4 +48,7 @@ export const adminApi = {
   payouts: () => request<PayoutsData>('GET', '/admin/payouts'),
   markPayout: (data: { creatorId: string; reference: string; note: string }) =>
     request<{ payout: PayoutRecord }>('POST', '/admin/payouts', { data }),
+  pricing: () => request<{ pricing: SessionPricing }>('GET', '/admin/pricing'),
+  updateSessionPrices: (data: { photo: Record<string, number>; video: Record<string, number> }) =>
+    request<{ pricing: SessionPricing }>('PATCH', '/admin/pricing', { data }),
 };

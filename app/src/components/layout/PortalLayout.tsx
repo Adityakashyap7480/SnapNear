@@ -6,10 +6,11 @@ import { Briefcase, CalendarPlus, Wifi, WifiOff, type LucideIcon } from 'lucide-
 import Logo from '../ui/Logo';
 import Avatar from '../ui/Avatar';
 import Text from '../ui/Text';
+import { SOCKET_EVENTS } from '../../config/events';
 import { useAuth } from '../../context/AuthContext';
 import { useCatalog } from '../../context/CatalogContext';
 import { ScrollPage } from '../../context/ScrollContext';
-import { useSocket } from '../../context/SocketContext';
+import { useSocket, useSocketEvent } from '../../context/SocketContext';
 import { APP_NAMES, ROLES, ROLE_LABELS } from '../../config/constants';
 import { ROUTES } from '../../config/routes';
 import { colors } from '../../theme/colors';
@@ -29,7 +30,10 @@ const TAGLINE: Record<string, string> = {
 export default function PortalLayout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { connected } = useSocket();
-  const { partnerPct, platformPct, startingPrice } = useCatalog();
+  const { partnerPct, platformPct, startingPrice, reload } = useCatalog();
+  useSocketEvent(SOCKET_EVENTS.CATALOG_UPDATE, () => {
+    reload();
+  });
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   if (!user) return null;

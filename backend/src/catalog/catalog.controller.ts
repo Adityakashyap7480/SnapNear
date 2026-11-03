@@ -4,9 +4,9 @@ import {
   CREATOR_SHARE,
   OCCASIONS,
   PLATFORM_SHARE,
-  PRICING_TIERS,
   SERVICE_LABELS,
   TIME_SLOTS,
+  getPricingTiers,
   getQuote,
 } from '../constants/pricing.js';
 
@@ -21,7 +21,7 @@ export class CatalogController {
   @Get('catalog')
   catalog() {
     const tiers = Object.fromEntries(
-      Object.entries(PRICING_TIERS).map(([type, list]) => [
+      Object.entries(getPricingTiers()).map(([type, list]) => [
         type,
         list.map((t) => ({ ...t, ...getQuote(type, t.id) })),
       ])

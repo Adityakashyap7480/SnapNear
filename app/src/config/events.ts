@@ -4,6 +4,7 @@ export const SOCKET_EVENTS = Object.freeze({
   FEED_UPDATE: 'feed:update',
   WALLET_PAYOUT: 'wallet:payout',
   ACCOUNT_RESTRICTED: 'account:restricted',
+  CATALOG_UPDATE: 'catalog:update',
 } as const);
 
 /** What happened to a booking; sent as `payload.event` on booking/feed updates. */

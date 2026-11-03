@@ -1,8 +1,7 @@
 /**
- * Single place to edit Step-2 session duration (hours) and prices.
- * Catalog API, booking quotes, and env defaults all read from here.
- *
- * Change a number here → it applies everywhere after backend restart/redeploy.
+ * Default session packages (length, labels, fallback prices).
+ * Super Admin can override the 1 Hour price at runtime; that value is stored in
+ * app_settings and wins over these numbers and PRICE_* env vars.
  */
 export const SESSION_PACKAGES = [
   {

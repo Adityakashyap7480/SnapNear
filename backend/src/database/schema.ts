@@ -6,6 +6,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -313,6 +314,16 @@ export const signupOtps = pgTable('signup_otps', {
   attempts: integer('attempts').notNull().default(0),
   expiresAt: ts('expires_at').notNull(),
   createdAt: ts('created_at').notNull().defaultNow(),
+});
+
+/**
+ * Small key/value store for Super Admin settings (session prices today, more later).
+ * `session_prices` holds optional overrides: { photo: { "1hr": 799 }, video: { "1hr": 1299 } }.
+ */
+export const appSettings = pgTable('app_settings', {
+  key: text('key').primaryKey(),
+  value: jsonb('value').notNull(),
+  updatedAt: ts('updated_at').notNull().defaultNow(),
 });
 
 /** Expo push tokens so partners/customers get alerts when the app is in the background. */

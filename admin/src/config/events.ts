@@ -5,6 +5,7 @@ export const SOCKET_EVENTS = Object.freeze({
   ADMIN_UPDATE: 'admin:update',
   WALLET_PAYOUT: 'wallet:payout',
   ACCOUNT_RESTRICTED: 'account:restricted',
+  CATALOG_UPDATE: 'catalog:update',
 });
 
 /** What happened to a booking; sent as `payload.event` on booking/feed/admin updates. */

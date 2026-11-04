@@ -42,6 +42,7 @@ const hashToken = (token: string) => crypto.createHash('sha256').update(token).d
 const RESET_OTP_TTL_MS = 10 * 60 * 1000;
 const SIGNUP_OTP_TTL_MS = 10 * 60 * 1000;
 const SIGNUP_OTP_MAX_ATTEMPTS = 5;
+const PHONE_TAKEN = 'An account with this phone number already exists.';
 const FORGOT_OK = {
   success: true as const,
   message: 'If that email is registered, we sent a 6-digit code.',
@@ -76,6 +77,12 @@ export class AuthService {
     return this.database.db;
   }
 
+  private async assertPhoneAvailable(phone: string) {
+    if (await this.users.phoneExists(phone)) {
+      throw new ApiError(409, PHONE_TAKEN, [{ field: 'phone', message: PHONE_TAKEN }]);
+    }
+  }
+
   /** Used by signup (Book a shoot + Partner) before opening Google. */
   async checkEmail(email: string) {
     if (email === SUPER_ADMIN.email) return { available: false };
@@ -95,6 +102,7 @@ export class AuthService {
     if (await this.users.emailExists(email)) {
       throw ApiError.conflict('An account with this email already exists. Please log in.');
     }
+    await this.assertPhoneAvailable(input.phone);
 
     const otp = newSignupOtp();
     const passwordHash = await bcrypt.hash(password, env.bcryptRounds);
@@ -206,6 +214,8 @@ export class AuthService {
       throw ApiError.badRequest('Start signup again — your pending details were lost.');
     }
 
+    await this.assertPhoneAvailable(pending.phone);
+
     const user = await this.users.create({
       role: pending.role,
       name: pending.name,
@@ -237,6 +247,7 @@ export class AuthService {
     if (await this.users.emailExists(email)) {
       throw ApiError.conflict('An account with this email already exists. Please log in.');
     }
+    await this.assertPhoneAvailable(phone);
 
     const user = await this.users.create({
       role,
@@ -301,6 +312,8 @@ export class AuthService {
       });
     }
 
+    await this.assertPhoneAvailable(input.phone);
+
     const password = input.password || `Gg${crypto.randomBytes(24).toString('base64url')}1a`;
     const user = await this.users.create({
       role: input.role,
@@ -328,6 +341,9 @@ export class AuthService {
   async updateMe(user: User, input: UpdateMeInput) {
     const changes = Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined));
     if (!Object.keys(changes).length) return { success: true, user: toPublicUser(user) };
+    if (typeof changes.phone === 'string' && changes.phone !== user.phone && (await this.users.phoneExists(changes.phone, user.id))) {
+      throw new ApiError(409, PHONE_TAKEN, [{ field: 'phone', message: PHONE_TAKEN }]);
+    }
     const withLocation =
       changes.latitude !== undefined && changes.longitude !== undefined && changes.address !== undefined
         ? { ...changes, locationUpdatedAt: new Date() }

@@ -76,7 +76,11 @@ export const users = pgTable(
     passwordResetExpiresAt: ts('password_reset_expires_at'),
     ...timestamps(),
   },
-  (t) => [index('users_role_idx').on(t.role, t.createdAt)]
+  (t) => [
+    index('users_role_idx').on(t.role, t.createdAt),
+    // Deleted accounts keep the row with phone cleared to '', so uniqueness is only for real numbers.
+    uniqueIndex('users_phone_unique').on(t.phone).where(sql`${t.phone} <> ''`),
+  ]
 );
 
 /** One row per partner (role = creator). */

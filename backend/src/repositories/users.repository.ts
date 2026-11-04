@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import bcrypt from 'bcryptjs';
-import { type SQL, eq, getTableColumns } from 'drizzle-orm';
+import { type SQL, and, eq, getTableColumns, ne } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import { env } from '../config/env.js';
 import { ACCOUNT_STATUS, ROLES } from '../constants/roles.js';
@@ -67,6 +67,20 @@ export class UsersRepository {
 
   async emailExists(email: string) {
     const [row] = await this.db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
+    return Boolean(row);
+  }
+
+  /** True when another account already uses this mobile number. Empty phones (deleted accounts) are ignored. */
+  async phoneExists(phone: string, excludeUserId?: string) {
+    const normalized = phone.trim();
+    if (!normalized) return false;
+    const filters = [eq(users.phone, normalized)];
+    if (excludeUserId) filters.push(ne(users.id, excludeUserId));
+    const [row] = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(...filters))
+      .limit(1);
     return Boolean(row);
   }
 
